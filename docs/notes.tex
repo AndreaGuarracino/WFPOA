@@ -1,0 +1,242 @@
+\documentclass[10pt]{article}         %% What type of document you're writing.
+
+%%%%% Preamble
+
+%% Packages to use
+
+\usepackage{amsmath,amsfonts,amssymb}   %% AMS mathematics macros
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{comment}
+
+%% Title Information.
+
+%\title{wavefronts dash the graph}
+\title{Wavefront sequence-to-graph alignment}
+\author{Andrea Guarracino and Erik Garrison}
+%% \date{21 July 2222}           %% By default, LaTeX uses the current date
+
+%%%%% The Document
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  We explore an extension to the wavefront algorithm that generalizes it to work on sequence graphs.
+  This follows the basic formulation of partial order alignment, wherein the recurrence relations defining alignment are extended to consider the topology of a target graph.
+%  The use of different wavefront extension patterns allows us to apply the approach to cyclic graphs.
+\end{abstract}
+
+
+\section{Segmented sequence graph}
+
+As input we take an alphabet $\Sigma$, a query sequence $q = \Sigma^n$, and a target sequence graph $G = (V, E \subseteq (V \times V ), \sigma : V \rightarrow \Sigma)$, where $V$ is the node set, $E$ is a set of directed edges, and $\sigma$ is a function that appoints one character to each node as the node label.
+We denote the in-neighbors of a node as $\delta_v^{in} = \{x : (x, v) \in E\}$, and the out-neighbors as $\delta_v^{out} = \{x : (v, x) \in E\}$.
+The segments of the graph $C$ are linear unbranching components made of series of nodes, $C = \{c = v_j \ldots v_{|j+c|} : \forall_{v_i, v_{i+1} \in c} (v_i, v_{i+1}) \in E \land |\delta_{v_i}^{out}| = 1 \land |\delta_{v_{i+1}}^{in}| = 1 \}$.
+Segments correspond to compressible series of nodes that could be combined into a single node with a string label without disrupting the language of strings represented by the graph.
+A graph $G$ with length $m = |V|$ can also be represented as a target sequence $T = \Sigma^m = t_0\ldots t_{m-1}$, where each character corresponds to a node in our graph, $\sigma(v_i) = t_i$.
+
+\section{Sequence-to-graph alignment}
+
+%In the process it should be created a WFA-DP-like table representing the possible alignments between the query and the targe.t
+%\bigbreak
+
+%Given a sequence graph $G = (V, E, \sigma)$, equivalently represented as a target sequence $t$ where each character corresponds to a node in our graph,
+%and a query sequence $q = \Sigma^n$, the algorithm fills the WFA-DP-like table $M$ of size $m \times |V|$, where rows are indexed by integers representing base pairs in the sequence, and columns are indexed by nodes in the graph.
+We define the pairwise global alignment between the query sequence $Q = q_0\ldots q_{n-1}$ and a graph $G \implies T = t_0\ldots t_{m-1}$ as the computation of the path from $(0, 0)$ to $(n, m)$ with minimum score, allowing for matches, mismatches, and gaps, each with costs defined by a different score function.
+A trivial graph with a single segment $|C| = 1$ is equivalently represented as a sequence $T$.
+In this case, we could apply standard pairwise alignment method like Smith-Waterman-Gotoh (SWG) \cite{smith1981comparison,gotoh1982improved} or the WaveFront Algorithm (WFA) \cite{Marco_Sola_2020} to derive an optimal alignment.
+To formulate sequence-to-graph alignment, we first define algorithms for pairwise sequence alignment, and then show how these are generalized to the case where the target graph is not a single segment.
+
+\section{Smith-Waterman-Gotoh}
+
+In SWG, we maintain three matrices, $H$, $E$, and $F$.\footnote{To avoid ambiguity about the polarization of insertions and deletions, we adopt the notation of \cite{Farrar_2006} to formulate SWG and refer to indels specifically as gaps versus the query or target sequence.}
+The value of a cell in $H_{i, j}$ represents the score of an alignment ending at the corresponding location in the query $q_i$ and the graph $t_j$, while $E$ contains scores ending with a gap extending along the target $T$ (or deletions in $Q$ relative to $T$) and $F$ contains scores ending in a gap extending along the query $Q$ (or insertions in $Q$ relative to $T$).
+Our gap-affine penalty scores $p = {a, x, o, e}$ define the penalty for matching ($a$) or mismatching ($x$) any base of the target and query, while the gap-penalty function for a gap of $n$ bp is expressed as $g(n) = o + n \cdot e$.
+A function $s(i, j)$ scores the bases in our query and target, yielding $a$ if $q_i = t_j$ and $x$ otherwise.
+Equation \ref{eq:swg} shows the recurrence relations in standard SWG\@.
+
+\begin{equation}
+  \left\{\begin{array}{l}
+  E_{i, j}=\min \left\{H_{i, j-1}+o+e, E_{i, j-1}+e\right\} \\
+  F_{i, j}=\min \left\{H_{i-1, j}+o+e, F_{i-1, j}+e\right\} \\
+  H_{i, j}=\min \left\{E_{i, j}, F_{i, j}, H_{i-1, j-1}+s\left(q_{i-1}, t_{j-1}\right)\right\}
+  \end{array}\right.
+  \label{eq:swg}
+\end{equation}
+
+\section{Partial order alignment}
+
+We now extend these recurrence relations to consider the topology of the graph.
+%we must extend these recurrence relations in SWG to consider $\delta_v^{in}$ for each node in $G$.
+Insertions in the query relative to the target only require that we consider scores in the same node of the graph, so the relation defining $F$ remains unchanged.
+However, both $H$ and $E$ must consider the set of inbound nodes $\delta_v^{in}$.
+Assuming that we index nodes $v \in V$ in the same order as characters in $t$, then $\sigma(v_j) = t[j]$ and $\delta_j^{in}$ yields the set of indexes of inbound nodes of $v_j$ in $t$.
+Equation \ref{eq:poa} shows the generalized recurrence relation in partial order alignment \cite{Lee_2002}, or SWG-POA\@.
+
+\begin{equation}
+  \left\{\begin{array}{l}
+  E_{i, j}=\min_{\forall u \in \delta_j^{in}} \left\{H_{i, u}+o+e, E_{i, u}+e\right\} \\
+  F_{i, j}=\min \left\{H_{i-1, j}+o+e, F_{i-1, j}+e\right\} \\
+  H_{i, j}=\min \left\{E_{i, j}, F_{i, j}, \min_{\forall u \in \delta_j^{in}} \{ H_{i-1, u}+s\left(q_{i-1}, t_{u}\right)\}\right\}
+  \end{array}\right.
+  \label{eq:poa}
+\end{equation}
+
+\section{Wavefront algorithm}
+
+WFA reformulates the SWG model to support the incomplete evaluation of the $H$ matrix while maintaining the guarantee that we find the lowest-cost path from $(0,0)$ to $(n,m)$.
+Instead of filling the matrix uniformly, such as vertically or horizontally, WFA derives a series of wavefronts, each of which contains the set of cells in $H$ reached from $(0,0)$ with the same score.
+Setting the match score $a = 0$ allows these wavefronts to extend in one step through consecutive matches.
+
+For a score $s$ and diagonal $k = j - i$, the furthest-reaching point $\mathcal{R}_{s,k}$ indicates the cell in $H$ that is the furthest from the beginning of diagonal $k$ with score $s$.
+$\widetilde{E}_{s, k}$, $\widetilde{F}_{s, k}$, and $\widetilde{H}_{s, k}$ store the offset in the diagonal to furthest-reaching point $\mathcal{R}_{s,k}$ in each of the SWG matrices.
+For a given score $s$, the $s$-wavefront $\mathcal{W}_s$ is the set of offsets $\widetilde{E}_{s, k}$, $\widetilde{F}_{s, k}$, and $\widetilde{H}_{s, k}$ for all $k$.
+Considering all $k$, we can more simply refer to the components of $\mathcal{W}_s$ as $\widetilde{E}_s$, $\widetilde{F}_s$, and $\widetilde{H}_s$.
+With each component of a wavefront represented as a vector of offsets centered around the main diagonal $k = 0$, we can define the highest (or rightmost) and lowest (or leftmost) diagonals in the component as $\widetilde{H}^{hi}_s$ and $\widetilde{H}^{lo}_s$.
+
+%Where our graph $G$ is directed and acyclic, we 
+
+%We generalize the notion of a diagonal, which is critical to the efficient formulation of WFA, to respect the set of segments $S$ in the graph.
+
+%Recurrence for WFA:
+
+In WFA, our goal is to derive a global alignment by computing the minimum $s$ such that any of the furthest-reaching points in $\mathcal{W}_s$ reaches $(n, m)$.
+Equation \ref{eq:wfa} shows the recurrence relations defined in WFA, which reformulate the same scoring model in SWG to consider furthest-reaching points in diagonals.
+
+\begin{equation}
+\begin{array}{lll}
+\widetilde{E}_{s, k}=\max \left\{\begin{array}{ll}
+\widetilde{H}_{s-o-e, k-1} & \text { (open gap in $Q$) } \\
+\widetilde{E}_{s-e, k-1} & \text { (extend gap in $Q$) }
+\end{array}\right\}+1 \\
+\widetilde{F}_{s, k}=\max \left\{\begin{array}{ll}
+\widetilde{H}_{s-o-e, k+1} & \text { (open gap in $T$) } \\
+\widetilde{F}_{s-e, k+1} & \text { (extend gap in $T$) }
+\end{array}\right\} \\
+\widetilde{H}_{s, k}=\max \left\{\begin{array}{ll}
+\widetilde{H}_{s-x, k}+1 & \text { (substitution) } \\
+\widetilde{E}_{s, k} & \text { (gap in $Q$) } \\
+\widetilde{F}_{s, k} & \text { (gap in $T$) }
+\end{array}\right\}
+\end{array}
+\label{eq:wfa}
+\end{equation}
+
+WFA thus computes the furthest-reaching points of $\mathcal{W}_s$ using only $\mathcal{W}_{s - o}$, $\mathcal{W}_{s - e}$, and $\mathcal{W}_{s - x}$.
+Note that, with $a=0$, considering matches requires us to extend all previously computed points by as far as possible by following matching characters along the diagonal.
+This extension of the wavefront in the case of matches is essential to the good memory and time characteristics of WFA\@.
+
+\section{Wavefront partial order alignment (WFPOA)}
+
+We consider the generalization of WFA to the case where our target is the directed acyclic graph $G$, which we term WFPOA\@.
+In general, this extension is similar to that applied to transform SWG into SWG-POA\@.
+But, the definition of diagonals in the alignment matrix is no longer stable across the full score matricies $H$, $E$, and $F$.
+As such, we must define wavefronts in terms of the diagonals of each segment $c \in C$.
+
+For a score $s$ and segment diagonal $k = j - i$, the furthest-reaching point $\mathcal{R}_{s,k,c}$ indicates the cell in $H$ that is the furthest from the beginning of diagonal $k$ in segment $c$ with score $s$.
+$\widetilde{E}_{s, k, c}$, $\widetilde{F}_{s, k, c}$, and $\widetilde{H}_{s, k, c}$ store the offset in the diagonal to furthest-reaching point $\mathcal{R}_{s,k,c}$ in each of the SWG-POA matrices.
+For a given score $s$, the $s$-wavefront $\mathcal{W}_s$ is the set of offsets $\widetilde{E}_{s, k, c}$, $\widetilde{F}_{s, k, c}$, and $\widetilde{H}_{s, k, c}$ for all $k$ on all $c$.
+Considering all $k$ on all $c$, we can more simply refer to the components of $\mathcal{W}_s$ as $\widetilde{E}_s$, $\widetilde{F}_s$, and $\widetilde{H}_s$.
+
+
+In WFPOA, our goal is to derive a global alignment by computing the minimum $s$ such that any of the furthest-reaching points in $\mathcal{W}_s$ reaches the end of any of the tails of the graph $V_{t} = \{ v : \delta_v^{out} = \emptyset$ $(n', v) \}$, with $n' < n$, or any of the set of points $\{ \forall_{v\in V} (n, v) \}$.
+Equation \ref{eq:wfpoa} shows the recurrence relations defined in WFPOA, which reformulate the same scoring model in SWG-POA to consider furthest-reaching points in diagonals on specific segments.
+We depend on function $\phi(k,c,c^\prec)$ which computes the diagonal on the inbound segment $c^\prec$ corresponding to the diagonal $k$ on $c$.
+
+\begin{equation}
+\begin{array}{lll}
+\widetilde{E}_{s, k, c}=\max_{\forall c^\prec \in \delta_c^{in}}  \left\{\begin{array}{ll}
+\widetilde{H}_{s-o-e, \phi(k-1,c,c^\prec), c^\prec} & \text { (open gap in $Q$) } \\
+\widetilde{E}_{s-e, \phi(k-1,c,c^\prec), c^\prec} & \text { (extend gap in $Q$) }
+\end{array}\right\}+1 \\
+\widetilde{F}_{s, k, c}=\max \left\{\begin{array}{ll}
+\widetilde{H}_{s-o-e, k+1, c} & \text { (open gap in $T$) } \\
+\widetilde{F}_{s-e, k+1, c} & \text { (extend gap in $T$) }
+\end{array}\right\} \\
+\widetilde{H}_{s, k, c}=\max \left\{\begin{array}{ll}
+\max_{\forall c^\prec \in \delta_c^{in}}\{\widetilde{H}_{s-x, \phi(k,c,c^\prec), c^\prec}+1 \} & \text { (substitution) } \\
+\widetilde{E}_{s, k, c} & \text { (gap in $Q$) } \\
+\widetilde{F}_{s, k, c} & \text { (gap in $T$) }
+\end{array}\right\}
+\end{array}
+\label{eq:wfpoa}
+\end{equation}
+
+We also need to extend the concept of distance along a diagonal to record the minimum and maximum possible diagonal traversal distances for each of our furthest-reaching points.
+
+\begin{comment} % notes
+
+Relation of the successive wavefront high and low bounds.
+
+\begin{equation}\begin{array}{l}
+\widetilde{H}_{s}^{h i}=\widetilde{E}_{s}^{h i}=\widetilde{F}_{s}^{h i}=\max \left\{\widetilde{H}_{s-x}^{h i}, \widetilde{H}_{s-o-e}^{h i}, \widetilde{E}_{s-e}^{h i}, \widetilde{F}_{s-e}^{h i}\right\}+1 \\
+\widetilde{H}_{s}^{l o}=\widetilde{E}_{s}^{l o}=\widetilde{F}_{s}^{l o}=\max \left\{\widetilde{H}_{s-x}^{l o}, \widetilde{H}_{s-o-e}^{l o}, \widetilde{E}_{s-e}^{l o}, \widetilde{F}_{s-e}^{l o}\right\}-1
+\end{array}\end{equation}
+
+
+
+%\bigbreak
+%Recurrence for WFA --- TODO: TO ADAPT FOR WFA
+
+
+
+Recurrence for SWG:
+
+\begin{equation}
+  \left\{\begin{array}{l}
+  I_{v, h}=\min \left\{M_{v, h-1}+o+e, I_{v, h-1}+e\right\} \\
+  D_{v, h}=\min \left\{M_{v-1, h}+o+e, D_{v-1, h}+e\right\} \\
+  M_{v, h}=\min \left\{I_{v, h}, D_{v, h}, M_{v-1, h-1}+s\left(q_{v-1}, t_{h-1}\right)\right\}
+  \end{array}\right.
+\end{equation}
+
+Recurrence for WFA:
+
+\begin{equation}
+\begin{array}{lll}
+\widetilde{I}_{s, k}=\max \left\{\begin{array}{ll}
+\widetilde{M}_{s-o-e, k-1} & \text { (Open insertion) } \\
+\widetilde{I}_{s-e, k-1} & \text { (Extend insertion) }
+\end{array}\right\}+1 \\
+\widetilde{D}_{s, k}=\max \left\{\begin{array}{ll}
+\widetilde{M}_{s-o-e, k+1} & \text { (Open deletion) } \\
+\widetilde{D}_{s-e, k+1} & \text { (Extend deletion) }
+\end{array}\right\} \\
+\widetilde{M}_{s, k}=\max \left\{\begin{array}{ll}
+\widetilde{M}_{s-x, k}+1 & \text { (Substitution) } \\
+\widetilde{I}_{s, k} & \text { (Insertion) } \\
+\widetilde{D}_{s, k} & \text { (Deletion) }
+\end{array}\right\}
+\end{array}
+\end{equation}
+
+Relation of the successive wavefront high and low bounds.
+
+\begin{equation}\begin{array}{l}
+\widetilde{M}_{s}^{h i}=\widetilde{I}_{s}^{h i}=\widetilde{D}_{s}^{h i}=\max \left\{\widetilde{M}_{s-x}^{h i}, \widetilde{M}_{s-o-e}^{h i}, \widetilde{I}_{s-e}^{h i}, \widetilde{D}_{s-e}^{h i}\right\}+1 \\
+\widetilde{M}_{s}^{l o}=\widetilde{I}_{s}^{l o}=\widetilde{D}_{s}^{l o}=\max \left\{\widetilde{M}_{s-x}^{l o}, \widetilde{M}_{s-o-e}^{l o}, \widetilde{I}_{s-e}^{l o}, \widetilde{D}_{s-e}^{l o}\right\}-1
+\end{array}\end{equation}
+
+\begin{equation}
+\left\{\begin{array}{l}
+C_{i,v} = \\
+C_{i-1,u} + \bigtriangleup_{i,v} $, for$ u \in \delta_v^in \\
+C_{i,u} + 1 $, for$ u \in \delta_v^in \\;
+C_{i-1,v} + 1
+\end{array}\right.
+\end{equation}
+
+with the boundary condition $C_{0,v} = \bigtriangleup_{0,v}$ for all $v \in V$, where $\bigtriangleup_{i,v}$ is the
+mismatch penalty between node character $\sigma(v \in V )$ and sequence character $s_i$, which is 0 for a match and 1
+for a mismatch.
+
+\end{comment}
+
+
+\bibliographystyle{unsrt}
+\bibliography{ref}
+
+\end{document}
+
