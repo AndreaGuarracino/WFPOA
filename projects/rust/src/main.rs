@@ -23,7 +23,8 @@ struct EditWavefrontsT {
     wavefronts_allocated: usize,
 
     // CIGAR
-    edit_cigar: String,
+    edit_cigar: Vec<u8>,
+    edit_cigar_length : usize,
 }
 
 fn edit_wavefronts_backtrace(
@@ -42,6 +43,8 @@ fn edit_wavefronts_backtrace(
     let wavefront = &wavefronts_slice[target_distance];
 
     let mut offset = wavefronts_slice[target_distance].offsets[(k - wavefront.lo_base) as usize];
+
+    wavefronts.edit_cigar_length = 0;
 
     while distance > 0 {
         /*print!("\tdistance: {}\n", distance);
@@ -64,20 +67,24 @@ fn edit_wavefronts_backtrace(
 
         // Traceback operation
         if wavefront.lo <= k + 1 && k + 1 <= wavefront.hi && offset == wavefront.offsets[(k + 1 + (-lo_base)) as usize] {
-            wavefronts.edit_cigar.push('D');
+            wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'D';
+            wavefronts.edit_cigar_length += 1;
             k += 1;
             distance -= 1;
         } else if wavefront.lo <= k - 1 && k - 1 <= wavefront.hi && offset == wavefront.offsets[(k - 1 + (-lo_base)) as usize] + 1 {
-            wavefronts.edit_cigar.push('I');
+            wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'I';
+            wavefronts.edit_cigar_length += 1;
             k -= 1;
             offset -= 1;
             distance -= 1;
         } else if wavefront.lo <= k && k <= wavefront.hi && offset == wavefront.offsets[(k + (-lo_base)) as usize] + 1 {
-            wavefronts.edit_cigar.push('X');
+            wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'X';
+            wavefronts.edit_cigar_length += 1;
             distance -= 1;
             offset -= 1;
         } else {
-            wavefronts.edit_cigar.push('M');
+            wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'M';
+            wavefronts.edit_cigar_length += 1;
             offset -= 1;
         }
 
@@ -86,7 +93,8 @@ fn edit_wavefronts_backtrace(
 
     // Account for last offset of matches
     while offset > 0 {
-        wavefronts.edit_cigar.push('M');
+        wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'M';
+        wavefronts.edit_cigar_length += 1;
         offset -= 1;
     }
 }
@@ -313,7 +321,8 @@ fn main() {
         wavefronts_allocated: 0,
 
         // Allocate CIGAR
-        edit_cigar: "".to_string(),
+        edit_cigar: vec![0; pattern_length + text_length],
+        edit_cigar_length: 0
     };
     //edit_wavefronts_init()
     for _p in 1..=wavefronts.max_distance {
@@ -327,5 +336,12 @@ fn main() {
         edit_wavefronts_align(&mut wavefronts, pattern, pattern_length, text, text_length);
     }
 
-    //println!("{}", wavefronts.edit_cigar.chars().rev().collect::<String>());
+    // Two ways to visualize the CIGAR string
+    // 1)
+    //for i in (0..wavefronts.edit_cigar_length).rev() {
+    //    print!("{}", wavefronts.edit_cigar[i] as char);
+    //}
+    // 2)
+    //wavefronts.edit_cigar.reverse();
+    //println!("{}", String::from_utf8(wavefronts.edit_cigar).unwrap());
 }
