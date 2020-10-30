@@ -113,7 +113,7 @@ fn edit_wavefronts_extend_wavefront(
     // Extend diagonally each wavefront point
     for k in k_min..=k_max {
         let mut v = (wavefront.offsets[(k + (-lo_base)) as usize] as isize - k) as usize; //EWAVEFRONT_V(k, offsets[k]); // offsets[k]-k
-        let mut h = (wavefront.offsets[(k + (-lo_base)) as usize] as isize) as usize;     //EWAVEFRONT_H(k, offsets[k]); // offsets[k]
+        let mut h = wavefront.offsets[(k + (-lo_base)) as usize] as usize;     //EWAVEFRONT_H(k, offsets[k]); // offsets[k]
 
         /*print!("\tedit_wavefronts_extend_wavefront\n");
         print!("\t\tk: {}\n", k);
@@ -193,7 +193,6 @@ fn edit_wavefronts_compute_wavefront(
     print!("\t\thi + 1, wavefront[{}]->offsets[{}]: {}\n", distance - 1, hi + 1, wavefront_next_wavefront[0].offsets[(hi + 1 + (-lo_base)) as usize]);*/
 }
 
-
 fn edit_wavefronts_align(
     wavefronts: &mut EditWavefrontsT,
     pattern: &[u8], pattern_length: usize,
@@ -215,10 +214,10 @@ fn edit_wavefronts_align(
 
     //print!("\t\tedit_wavefronts->wavefronts_allocated: {}\n", wavefronts.wavefronts_allocated);
 
-    let mut distance : usize = 0;
+    let mut target_distance : usize = max_distance;
 
     // Compute wavefronts for increasing distance
-    while distance < max_distance {
+    for distance in 0..max_distance {
         // Extend diagonally each wavefront point
         edit_wavefronts_extend_wavefront(
             &mut wavefronts.wavefronts[distance],
@@ -238,6 +237,7 @@ fn edit_wavefronts_align(
                    target_offset
             );*/
 
+            target_distance = distance;
             break;
         }
 
@@ -248,12 +248,10 @@ fn edit_wavefronts_align(
             text_length,
             distance + 1,
         );
-
-        distance += 1;
     }
 
     // Backtrace wavefronts
-    edit_wavefronts_backtrace(wavefronts, pattern, text, target_k, distance);
+    edit_wavefronts_backtrace(wavefronts, pattern, text, target_k, target_distance);
 }
 
 fn edit_wavefronts_clean(
@@ -271,7 +269,7 @@ fn edit_wavefronts_allocate_wavefront(
     lo_base: isize, hi_base: isize,
 ) {
     // Compute limits
-    let wavefront_length: usize = (hi_base - lo_base + if hi_base == lo_base && hi_base == 0 { 1 } else { 2 }) as usize; // (+1) for k=0
+    let wavefront_length: usize = (hi_base - lo_base + 2) as usize;//if hi_base == lo_base && hi_base == 0 { 1 } else { 2 }) as usize; // (+1) for k=0
 
     // Configure offsets
     wavefront.lo = lo_base;
@@ -325,13 +323,13 @@ fn main() {
         edit_cigar_length: 0
     };
     //edit_wavefronts_init()
-    for _p in 1..=wavefronts.max_distance {
+    for _ in 0..wavefronts.max_distance {
         wavefronts.wavefronts.push(
             EditWavefrontT { lo: 0, hi: 0, lo_base: 0, offsets: Vec::new() }
         );
     }
 
-    for _i in 0..reps {
+    for _ in 0..reps {
         edit_wavefronts_clean(&mut wavefronts);
         edit_wavefronts_align(&mut wavefronts, pattern, pattern_length, text, text_length);
     }

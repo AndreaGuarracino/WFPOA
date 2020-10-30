@@ -6,7 +6,10 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# https://doc.rust-lang.org/cargo/reference/profiles.html
+# https://rust-embedded.github.io/book/unsorted/speed-vs-size.html#optimize-for-speed
 [profile.release]
 opt-level = 3
+lto = "thin"
 
 [dependencies]
