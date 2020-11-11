@@ -7,7 +7,6 @@
 
 
 int main(int argc, char *argv[]) {
-
     po_graph graph;
     po_graph_init(&graph, 20);
 
@@ -104,7 +103,7 @@ int main(int argc, char *argv[]) {
                 seq3, strlen(seq3),
                 weights);
     }
-/*
+
     po_node* tmp_node;
     po_edge* tmp_edge;
     printf("num_sequences: %d\n", graph.num_sequences);
@@ -133,7 +132,7 @@ int main(int argc, char *argv[]) {
     for (uint32_t i = 0; i < graph.num_nodes; i++){
         printf("\t%d\t%d\n", i, graph.rank_to_node_id[i]);
     }
-    */
+
     char **msa_seq = NULL;
     uint32_t msa_len;
     generate_multiple_sequence_alignment(&graph, &msa_seq, &msa_len, true);
