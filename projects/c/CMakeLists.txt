@@ -10,5 +10,8 @@ project(wfpoa)
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g3")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3")
 
+set(CMAKE_C_SOURCE_FILE_EXTENSIONS src/wfapoa.edit.alignment.c)
+add_executable(wfpoa ${CMAKE_SOURCE_DIR}/src/wfpoa.edit.alignment.c src/graph.c src/graph.h)
+
 set(CMAKE_C_SOURCE_FILE_EXTENSIONS src/wfa.edit.alignment.c)
-add_executable(wfpoa ${CMAKE_SOURCE_DIR}/src/wfa.edit.alignment.c)
+add_executable(wfa_edit ${CMAKE_SOURCE_DIR}/src/wfa.edit.alignment.c)
