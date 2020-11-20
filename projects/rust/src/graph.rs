@@ -1,7 +1,8 @@
-pub(crate) type Alignment = Vec<(Option<usize>, Option<usize>)>;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-// todo I want to avoid cloning edges (I need pointer to manage two owner)
-#[derive(Clone)]
+pub type Alignment = Vec<(Option<usize>, Option<usize>)>;
+
 pub struct POEdge {
     begin_node_id: usize,
     end_node_id: usize,
@@ -22,15 +23,16 @@ pub struct PONode {
     id: usize,
     character: u8,
 
-    in_edges: Vec<POEdge>,
-    out_edges: Vec<POEdge>,
+    in_edges: Vec<Rc<RefCell<POEdge>>>,
+    out_edges: Vec<Rc<RefCell<POEdge>>>,
 
     aligned_nodes_ids: Vec<usize>,
 }
 
 impl PONode {
     pub fn successor(&self, label: &u32) -> Option<usize> {
-        for edge in self.out_edges.iter() {
+        for edge_ in self.out_edges.iter() {
+            let edge = edge_.borrow();
             for current_label in edge.sequence_labels.iter() {
                 if current_label == label {
                     return Some(edge.end_node_id);
@@ -60,14 +62,18 @@ impl std::fmt::Display for POGraph {
         for node in &self.nodes {
             graph_to_string.push_str(&format!("\t{}: {}\n", node.id, node.character as char));
 
-            for edge in &node.in_edges {
+            for edge_ in &node.in_edges {
+                let edge = edge_.borrow();
+
                 graph_to_string.push_str(&format!("\t\t{} <--- {}\n", edge.end_node_id, edge.begin_node_id));
                 for label in &edge.sequence_labels {
                     graph_to_string.push_str(&format!("\t\t\tsequence_label: {}\n", label));
                 }
             }
 
-            for edge in &node.out_edges {
+            for edge_ in &node.out_edges {
+                let edge = edge_.borrow();
+
                 graph_to_string.push_str(&format!("\t\t{} ---> {}\n", edge.begin_node_id, edge.end_node_id));
                 for label in &edge.sequence_labels {
                     graph_to_string.push_str(&format!("\t\t\tsequence_label: {}\n", label));
@@ -85,6 +91,7 @@ impl std::fmt::Display for POGraph {
 
 impl POGraph {
     pub const fn new() -> POGraph {
+        // todo use with_capacity
         return POGraph {
             nodes: Vec::new(),
             rank_to_node_id: Vec::new(),
@@ -93,10 +100,7 @@ impl POGraph {
         };
     }
 
-    pub fn add_node(
-        &mut self,
-        character: u8,
-    ) -> usize {
+    pub fn add_node(&mut self, character: u8) -> usize {
         let last_id = self.nodes.len();
 
         self.nodes.push(PONode {
@@ -116,34 +120,24 @@ impl POGraph {
         end_node_id: usize,
         weight: u32,
     ) {
-        for edge in self.nodes[begin_node_id].out_edges.iter_mut() {
+        for edge_ in self.nodes[begin_node_id].out_edges.iter_mut() {
+            let mut edge = edge_.borrow_mut();
+
             if edge.end_node_id == end_node_id {
                 edge.add_sequence(self.sequences_begin_nodes_ids.len() as u32, weight);
-
-                //+++++++++++++++++++++++++++++++++++
-                // todo I need a way to manage that without the shared_ptr (not available in Rust!)
-                //  with shared pointer I would not need to update both the memory locations
-                for edge in self.nodes[end_node_id].in_edges.iter_mut() {
-                    if edge.begin_node_id == begin_node_id {
-                        edge.add_sequence(self.sequences_begin_nodes_ids.len() as u32, weight);
-                        return;
-                    }
-                }
-                panic!("po_graph_add_edge: edge that was supposed to be present not found!");
-                //+++++++++++++++++++++++++++++++++++
+                return;
             }
         }
 
-        let new_edge: POEdge = POEdge {
+        let new_edge = Rc::new(RefCell::new(POEdge {
             begin_node_id,
             end_node_id,
             sequence_labels: vec![self.sequences_begin_nodes_ids.len() as u32],
             total_weight: weight as i64,
-        };
+        }));
 
-        // todo manage two owners, avoiding duplicating stuff
         self.nodes[begin_node_id].out_edges.push(new_edge.clone());
-        self.nodes[end_node_id].in_edges.push(new_edge.clone());
+        self.nodes[end_node_id].in_edges.push(new_edge);
     }
 
     pub fn add_sequence(
@@ -151,7 +145,8 @@ impl POGraph {
         sequence: &[u8],
         weights: &[u32],
         begin: usize,
-        end: usize) -> Option<usize> {
+        end: usize
+    ) -> Option<usize> {
         if begin == end {
             return None;
         }
@@ -194,10 +189,8 @@ impl POGraph {
                 }
             }
 
-            //#ifdef CAUTIOUS_MODE
-            assert!(valid_seq_ids[0] <= sequence.len());
-            assert!(*valid_seq_ids.last().unwrap() + 1 <= sequence.len());
-            //#endif
+            debug_assert!(valid_seq_ids[0] <= sequence.len());
+            debug_assert!(*valid_seq_ids.last().unwrap() + 1 <= sequence.len());
 
             let tmp = self.nodes.len();
             begin_node_id = self.add_sequence(sequence, weights, 0, valid_seq_ids[0]);
@@ -281,9 +274,7 @@ impl POGraph {
         self.topological_sort();
     }
 
-    fn topological_sort(
-        &mut self
-    ) {
+    fn topological_sort(&mut self) {
         self.rank_to_node_id.clear();
         self.rank_to_node_id = Vec::with_capacity(self.nodes.len());
 
@@ -304,7 +295,9 @@ impl POGraph {
                 let mut valid = true;
 
                 if node_marks[node_id] != 2 {
-                    for edge in &self.nodes[node_id].in_edges {
+                    for edge_ in &self.nodes[node_id].in_edges {
+                        let edge = edge_.borrow();
+
                         if node_marks[edge.begin_node_id] != 2 {
                             nodes_to_visit.push(edge.begin_node_id);
                             valid = false;
@@ -321,10 +314,7 @@ impl POGraph {
                         }
                     }
 
-                    //#ifdef CAUTIOUS_MODE
-                    //    assert!((valid || node_marks[node_id] != 1) && "Graph is not a DAG!");
-                    assert!(valid || node_marks[node_id] != 1, "Graph is not a DAG!");
-                    //#endif
+                    debug_assert!(valid || node_marks[node_id] != 1, "Graph is not a DAG!");
 
                     if valid {
                         node_marks[node_id] = 2;
@@ -343,25 +333,19 @@ impl POGraph {
             }
         }
 
-        //#ifdef CAUTIOUS_MODE
-        assert!(self.is_topologically_sorted());
-        //#endif
+        debug_assert!(self.is_topologically_sorted());
     }
 
-    fn is_topologically_sorted(
-        &self
-    ) -> bool {
-        //#ifdef CAUTIOUS_MODE
-        assert_eq!(self.nodes.len(), self.rank_to_node_id.len());
-        //#endif
+    fn is_topologically_sorted(&self) -> bool {
+        debug_assert_eq!(self.nodes.len(), self.rank_to_node_id.len());
 
         let mut visited_nodes = vec![false; self.nodes.len()];
 
         for i in 0..self.nodes.len() {
             let node_id = &self.rank_to_node_id[i];
 
-            for edge in &self.nodes[*node_id].in_edges {
-                if !visited_nodes[edge.begin_node_id] {
+            for edge_ in &self.nodes[*node_id].in_edges {
+                if !visited_nodes[edge_.borrow().begin_node_id] {
                     return false;
                 }
             }
@@ -372,9 +356,7 @@ impl POGraph {
         return true;
     }
 
-    fn initialize_multiple_sequence_alignment(
-        &self,
-    ) -> (usize, Vec<usize>) {
+    fn initialize_multiple_sequence_alignment(&self) -> (usize, Vec<usize>) {
         let mut node_id_to_msa_rank = vec![0; self.nodes.len()];
 
         let mut msa_id: usize = 0;
@@ -444,9 +426,11 @@ impl POGraph {
     ) -> usize {
         let node_id = self.rank_to_node_id[*rank].clone();
 
-        for out_edge in &self.nodes[node_id].out_edges {
-            for in_edge in &self.nodes[out_edge.end_node_id].in_edges {
-                if in_edge.begin_node_id != node_id {
+        for out_edge_ in &self.nodes[node_id].out_edges {
+            let out_edge = out_edge_.borrow();
+
+            for in_edge_ in &self.nodes[out_edge.end_node_id].in_edges {
+                if in_edge_.borrow().begin_node_id != node_id {
                     scores[out_edge.begin_node_id] = -1;
                 }
             }
@@ -461,7 +445,9 @@ impl POGraph {
             scores[node_id] = -1;
             predecessors[node_id] = -1;
 
-            for edge in &node.in_edges {
+            for edge_ in &node.in_edges {
+                let edge = edge_.borrow();
+
                 if scores[edge.begin_node_id] == -1 {
                     continue;
                 }
@@ -488,9 +474,7 @@ impl POGraph {
         return max_score_id as usize;
     }
 
-    fn traverse_heaviest_bundle(
-        &mut self,
-    ) {
+    fn traverse_heaviest_bundle(&mut self) {
         let num_nodes = self.nodes.len();
 
         let mut predecessors: Vec<i32> = vec![-1; num_nodes];
@@ -499,7 +483,9 @@ impl POGraph {
         let mut max_score_id = 0;
         for node_id in &self.rank_to_node_id {
             let node = &self.nodes[*node_id];
-            for edge in &node.in_edges {
+            for edge_ in &node.in_edges {
+                let edge = edge_.borrow();
+
                 if scores[*node_id] < edge.total_weight ||
                     (scores[*node_id] == edge.total_weight &&
                         scores[predecessors[*node_id] as usize] <= scores[edge.begin_node_id]
