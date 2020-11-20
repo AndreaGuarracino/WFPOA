@@ -90,13 +90,12 @@ impl std::fmt::Display for POGraph {
 }
 
 impl POGraph {
-    pub const fn new() -> POGraph {
-        // todo use with_capacity
+    pub fn new(num_initial_sequences: usize, num_initial_nodes: usize) -> POGraph {
         return POGraph {
-            nodes: Vec::new(),
-            rank_to_node_id: Vec::new(),
-            sequences_begin_nodes_ids: Vec::new(),
-            consensus: Vec::new(),
+            nodes: Vec::with_capacity(num_initial_nodes),
+            rank_to_node_id: Vec::with_capacity(num_initial_nodes),
+            sequences_begin_nodes_ids: Vec::with_capacity(num_initial_sequences),
+            consensus: Vec::with_capacity(num_initial_nodes),
         };
     }
 
@@ -145,7 +144,7 @@ impl POGraph {
         sequence: &[u8],
         weights: &[u32],
         begin: usize,
-        end: usize
+        end: usize,
     ) -> Option<usize> {
         if begin == end {
             return None;
@@ -225,7 +224,7 @@ impl POGraph {
                             if aligned_to_node_id == None {
                                 new_node_id = Some(self.add_node(letter));
 
-                                // todo: I don't like to copy everything to avoid borrowing problem in the for
+                                // todo: I don't like to copy everything to avoid borrowing problems in the for
                                 let aligned_nodes_ids = self.nodes[*node_id].aligned_nodes_ids.to_vec();
 
                                 for aligned_node_id in aligned_nodes_ids.iter() {

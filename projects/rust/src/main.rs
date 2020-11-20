@@ -3,7 +3,10 @@ use crate::graph::{POGraph, Alignment};
 mod graph;
 
 fn main() {
-    let mut my_graph = POGraph::new();
+    let num_initial_sequences = 3;  // Number of sequences to align
+    let num_initial_nodes = 128;    // At least equal to the length of the longest sequence
+
+    let mut my_graph = POGraph::new(num_initial_sequences, num_initial_nodes);
 
     let mut alignment_result: Alignment = Vec::new();
 
