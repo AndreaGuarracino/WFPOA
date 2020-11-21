@@ -124,8 +124,8 @@ fn edit_wavefronts_extend_wavefront(
         let mut h = *offset as usize;     //EWAVEFRONT_H(k, offsets[k]); // offsets[k]
 
         /*print!("\tedit_wavefronts_extend_wavefront\n");
-        print!("\t\tk: {}\n", k);
-        print!("\t\toffsets[{}]: {}\n", k, wavefront.offsets[(k + (-lo_base)) as usize]);
+        print!("\t\tk: {}\n", i as isize + k_min);
+        print!("\t\toffsets[{}]: {}\n", i as isize + k_min, offset);
         print!("\t\t\t(v, h) == ({}, {}) ==> ({}, {})\n", v, h, pattern[v] as char, text[h] as char);*/
         while v < pattern_length && h < text_length && pattern[v] == text[h] {
             *offset += 1;
@@ -133,7 +133,7 @@ fn edit_wavefronts_extend_wavefront(
             v += 1;
             h += 1;
 
-            /*print!("\t\t\twavefronts[{}]->offsets[{}]: {}\n", _distance, k, wavefront.offsets[(k + (-lo_base + 0)) as usize]);
+            /*print!("\t\t\twavefronts[{}]->offsets[{}]: {}\n", _distance, i as isize + k_min, offset);
             print!("\t\t\t(v, h) == ({}, {}) ==> ({}, {})\n", v, h, pattern[v] as char, text[h] as char);*/
         }
     }
@@ -343,7 +343,8 @@ fn main() {
     //for i in (0..wavefronts.edit_cigar_length).rev() {
     //    print!("{}", wavefronts.edit_cigar[i] as char);
     //}
-    // 2) buggy
+    // 2)
+    //wavefronts.edit_cigar.truncate(wavefronts.edit_cigar_length);
     //wavefronts.edit_cigar.reverse();
     //println!("{}", String::from_utf8(wavefronts.edit_cigar).unwrap());
 }

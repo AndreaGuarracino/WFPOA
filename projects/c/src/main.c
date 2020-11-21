@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
 
     printf("Rank\tNodeId\n");
     for (uint32_t i = 0; i < graph.num_nodes; i++){
-        printf("\t%d\t%d\n", i, graph.rank_to_node_id[i]);
+        printf("\t%d\t%d (%c)\n", i, graph.rank_to_node_id[i], graph.nodes[graph.rank_to_node_id[i]].character);
     }
 
     char **msa_seq = NULL;

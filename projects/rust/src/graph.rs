@@ -82,7 +82,7 @@ impl std::fmt::Display for POGraph {
         }
         graph_to_string.push_str(&format!("Rank\tNodeId\n"));
         for i_node in self.rank_to_node_id.iter().enumerate() {
-            graph_to_string.push_str(&format!("\t{}\t{}\n", i_node.0, i_node.1));
+            graph_to_string.push_str(&format!("\t{}\t{} ({})\n", i_node.0, i_node.1, self.nodes[*i_node.1].character as char));
         }
 
         write!(f, "{}", graph_to_string)
@@ -105,9 +105,9 @@ impl POGraph {
         self.nodes.push(PONode {
             id: last_id,
             character,
-            in_edges: vec![],
-            out_edges: vec![],
-            aligned_nodes_ids: vec![],
+            in_edges: Vec::new(),
+            out_edges: Vec::new(),
+            aligned_nodes_ids: Vec::new(),
         });
 
         return last_id;
@@ -171,11 +171,9 @@ impl POGraph {
         if sequence.len() == 0 {
             return;
         }
-
-        if sequence.len() != weights.len() {
-            panic!("[wfpoa::po_graph_add_alignment] error: sequence and weights are of unequal size!");
-        }
         //#endif
+
+        debug_assert_eq!(sequence.len(), weights.len(), "[wfpoa::POGraph::add_alignment] error: sequence and weights are of unequal size!");
 
         let mut begin_node_id;
         if alignment.is_empty() { //  no alignment
@@ -356,6 +354,8 @@ impl POGraph {
     }
 
     fn initialize_multiple_sequence_alignment(&self) -> (usize, Vec<usize>) {
+        let max_rank = self.nodes.len() - 1;
+
         let mut node_id_to_msa_rank = vec![0; self.nodes.len()];
 
         let mut msa_id: usize = 0;
@@ -363,19 +363,19 @@ impl POGraph {
         loop {
             let node_id = self.rank_to_node_id[i];
 
-            node_id_to_msa_rank[node_id] = msa_id.clone();
+            node_id_to_msa_rank[node_id] = msa_id;
 
             for _ in 0..self.nodes[node_id].aligned_nodes_ids.len() {
                 i += 1;
-                node_id_to_msa_rank[self.rank_to_node_id[i]] = msa_id.clone();
+                node_id_to_msa_rank[self.rank_to_node_id[i]] = msa_id;
             }
 
             msa_id += 1;
 
-            i += 1;
-            if i >= self.nodes.len() {
+            if i >= max_rank {
                 break;
             }
+            i += 1;
         }
 
         return (msa_id, node_id_to_msa_rank);
