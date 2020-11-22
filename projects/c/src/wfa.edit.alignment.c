@@ -279,7 +279,7 @@ void edit_wavefronts_align(
     }
 
     // Backtrace wavefronts
-    edit_wavefronts_backtrace(wavefronts, pattern, text, target_k, distance);
+    wavefronts->edit_cigar_length = edit_wavefronts_backtrace(wavefronts, pattern, text, target_k, distance);
 }
 
 int main(int argc, char *argv[]) {
@@ -308,4 +308,9 @@ int main(int argc, char *argv[]) {
         edit_wavefronts_clean(&wavefronts);
         edit_wavefronts_align(&wavefronts, pattern, pattern_length, text, text_length);
     }
+
+    // Display the CIGAR string
+    //for (i = wavefronts.edit_cigar_length - 1; i >= 0; --i){
+    //    printf("%c", wavefronts.edit_cigar[i]);
+    //}
 }
