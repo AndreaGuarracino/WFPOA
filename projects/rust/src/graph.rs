@@ -271,7 +271,47 @@ impl POGraph {
         self.topological_sort();
     }
 
+    // Kahn’s algorithm
     fn topological_sort(&mut self) {
+        // todo try to re-use memory and eventually shrink it later, or push new elements
+        self.rank_to_node_id.clear();
+        self.rank_to_node_id = Vec::with_capacity(self.nodes.len());
+
+        // O(V)
+        let mut in_degree = vec![0; self.nodes.len()];
+        for node in &self.nodes {
+            in_degree[node.id] = node.in_edges.len();
+        }
+
+        let mut node_ids_queue = vec![START_NODE_ID; 1];
+
+        // Initialize count of visited vertices
+        let mut num_visited_vertices: usize = 0;
+
+        while !node_ids_queue.is_empty() {
+            let node_id = node_ids_queue.pop().unwrap();
+
+            self.rank_to_node_id.push(node_id);
+
+            for edge_ in &self.nodes[node_id].out_edges {
+                let end_node_id = edge_.borrow().end_node_id;
+                in_degree[end_node_id] -= 1;
+
+                if in_degree[end_node_id] == 0 {
+                    node_ids_queue.push(end_node_id);
+                }
+            }
+
+            num_visited_vertices += 1;
+        }
+
+        // Check if there was a cycle
+        debug_assert_eq!(num_visited_vertices, self.nodes.len(), "[wfpoa::POGraph::topological_sort] error: Graph is not a DAG!");
+        //debug_assert!(self.is_topologically_sorted());
+    }
+
+    fn _topological_sort(&mut self) {
+        // todo to use and then eventyally shrink or push
         self.rank_to_node_id.clear();
         self.rank_to_node_id = Vec::with_capacity(self.nodes.len());
 
