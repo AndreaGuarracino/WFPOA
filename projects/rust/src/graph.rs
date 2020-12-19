@@ -76,7 +76,7 @@ impl std::fmt::Display for POGraph {
                 let edge = edge_.borrow();
 
                 graph_to_string.push_str(
-                    &format!("\t\t{} ({}) <--- {} ({})\n",  node_id_to_rank[edge.end_node_id], self.nodes[edge.end_node_id].character as char, node_id_to_rank[edge.begin_node_id], self.nodes[edge.begin_node_id].character as char)
+                    &format!("\t\t{} ({}) <--- {} ({})\n", node_id_to_rank[edge.end_node_id], self.nodes[edge.end_node_id].character as char, node_id_to_rank[edge.begin_node_id], self.nodes[edge.begin_node_id].character as char)
                 );
                 for label in &edge.sequence_labels {
                     graph_to_string.push_str(&format!("\t\t\tsequence_label: {}\n", label));
@@ -105,7 +105,7 @@ impl std::fmt::Display for POGraph {
 
 impl POGraph {
     pub fn new(num_initial_sequences: usize, num_initial_nodes: usize) -> POGraph {
-         let mut graph = POGraph {
+        let mut graph = POGraph {
             nodes: Vec::with_capacity(num_initial_nodes + 2),
             rank_to_node_id: Vec::with_capacity(num_initial_nodes + 2),
             sequences_begin_nodes_ids: Vec::with_capacity(num_initial_sequences),
@@ -213,10 +213,10 @@ impl POGraph {
             debug_assert!(*valid_seq_ids.last().unwrap() + 1 <= sequence.len());
 
             let tmp = self.nodes.len();
-            begin_end_node_ids = self.add_sequence(sequence, weights, 0, valid_seq_ids[0]);
+            self.add_sequence(sequence, weights, 0, valid_seq_ids[0]);
             let mut head_node_id = if tmp == self.nodes.len() { None } else { Some(self.nodes.len() - 1) };
 
-            begin_end_node_ids  = self.add_sequence(
+            begin_end_node_ids = self.add_sequence(
                 sequence, weights,
                 *valid_seq_ids.last().unwrap() + 1, sequence.len(),
             );
@@ -332,12 +332,12 @@ impl POGraph {
         }
 
         // Check if there was a cycle
-        debug_assert_eq!(num_visited_vertices, self.nodes.len(), "[wfpoa::POGraph::topological_sort] error: Graph is not a DAG!");
+        debug_assert_eq!(num_visited_vertices, self.nodes.len(), "[wfpoa::POGraph::topological_sort] error: Graph is not a DAG");
         //debug_assert!(self.is_topologically_sorted());
     }
 
     fn _topological_sort(&mut self) {
-        // todo to use and then eventyally shrink or push
+        // todo try to re-use memory and eventually shrink it later, or push new elements
         self.rank_to_node_id.clear();
         self.rank_to_node_id = Vec::with_capacity(self.nodes.len());
 
@@ -396,10 +396,10 @@ impl POGraph {
             }
         }
 
-        debug_assert!(self.is_topologically_sorted());
+        debug_assert!(self._is_topologically_sorted());
     }
 
-    fn is_topologically_sorted(&self) -> bool {
+    fn _is_topologically_sorted(&self) -> bool {
         debug_assert_eq!(self.nodes.len(), self.rank_to_node_id.len());
 
         let mut visited_nodes = vec![false; self.nodes.len()];
