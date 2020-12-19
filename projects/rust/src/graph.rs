@@ -459,6 +459,8 @@ impl POGraph {
         // extract sequences from graph and create msa strings (add indels(-) where necessary)
 
         for i in 0..self.sequences_begin_nodes_ids.len() {
+            msa_seq[i][0] = b'S';
+
             let mut node_id = self.sequences_begin_nodes_ids[i];
 
             loop {
