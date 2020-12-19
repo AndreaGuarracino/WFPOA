@@ -10,6 +10,30 @@ macro_rules! abs {
     }}
 }
 
+macro_rules! ewavefront_diagonal {
+    ($h: expr, $v: expr) => {{
+        $h - $v
+    }}
+}
+
+macro_rules! ewavefront_offset {
+    ($h: expr, $v: expr) => {{
+        $h
+    }}
+}
+
+macro_rules! ewavefront_v {
+    ($k: expr, $offset: expr) => {{
+        $offset - $k
+    }}
+}
+
+macro_rules! ewavefront_h {
+    ($k: expr, $offset: expr) => {{
+        $offset
+    }}
+}
+
 type EwfOffsetT = i16;
 
 struct EditWavefrontT {
@@ -120,22 +144,24 @@ fn edit_wavefronts_extend_wavefront(
 
     // Extend diagonally each wavefront point
     for (i, offset) in wavefront.offsets.iter_mut().skip((k_min + (-wavefront.lo_base)) as usize).take((wavefront.hi - wavefront.lo + 1) as usize).enumerate() {
-        let mut v = (*offset as isize - (i as isize + k_min)) as usize; //EWAVEFRONT_V(k, offsets[k]); // offsets[k]-k
-        let mut h = *offset as usize;     //EWAVEFRONT_H(k, offsets[k]); // offsets[k]
+        let mut v = ewavefront_v!(i as isize + k_min, *offset as isize) as usize; // offsets[k]-k
+        let mut h = ewavefront_h!(i as isize + k_min, *offset as isize) as usize; // offsets[k]
 
         /*print!("\tedit_wavefronts_extend_wavefront\n");
-        print!("\t\tk: {}\n", i as isize + k_min);
-        print!("\t\toffsets[{}]: {}\n", i as isize + k_min, offset);
-        print!("\t\t\t(v, h) == ({}, {}) ==> ({}, {})\n", v, h, pattern[v] as char, text[h] as char);*/
+        print!("\t\tk: {}\n", i as isize + k_min);*/
         while v < pattern_length && h < text_length && pattern[v] == text[h] {
-            *offset += 1;
-
-            v += 1;
-            h += 1;
-
+            //print!("{}\t{}\t{}\t{}\t{}\tM\n", v, h, *offset, _distance, i as isize + k_min);
             /*print!("\t\t\twavefronts[{}]->offsets[{}]: {}\n", _distance, i as isize + k_min, offset);
             print!("\t\t\t(v, h) == ({}, {}) ==> ({}, {})\n", v, h, pattern[v] as char, text[h] as char);*/
+
+            *offset += 1;
+            v += 1;
+            h += 1;
         }
+
+        //print!("{}\t{}\t{}\t{}\t{}\tX\n", v, h, *offset, _distance, i as isize + k_min);
+        /*print!("\t\toffsets[{}]: {}\n", i as isize + k_min, offset);
+        print!("\t\t\t(v, h) == ({}, {}) ==> ({}, {})\n", v, h, pattern[v] as char, text[h] as char);*/
     }
     //print!("\t---------------\n");
 }
@@ -204,12 +230,12 @@ fn edit_wavefronts_align(
     text: &[u8], text_length: usize,
 ) {
     // Parameters
-    let target_k: isize = text_length as isize - pattern_length as isize;//EWAVEFRONT_DIAGONAL(text_length, pattern_length); // h - v
+    let target_k: isize = ewavefront_diagonal!(text_length as isize, pattern_length as isize);  // h - v
     let target_k_abs: usize = abs!(target_k) as usize;
-    let target_offset: EwfOffsetT = text_length as EwfOffsetT;//EWAVEFRONT_OFFSET(text_length, pattern_length); // h
+    let target_offset: EwfOffsetT = ewavefront_offset!(text_length, pattern) as EwfOffsetT;     // h
 
     /*print!("edit_wavefronts_align\n");
-    print!("\ttarget_k: {} == text_length ({}) - pattern_lenght ({})\n", target_k, text_length, pattern_length);
+    print!("\ttarget_k: {} == text_length ({}) - pattern_length ({})\n", target_k, text_length, pattern_length);
     print!("\ttarget_offset: {} == text_length ({})\n\n", target_offset, text_length);*/
 
     // Init wavefronts
@@ -231,7 +257,7 @@ fn edit_wavefronts_align(
         );
 
         // Exit condition
-        if target_k_abs <= distance &&
+        if distance >= target_k_abs  &&
             wavefronts.wavefronts[distance].offsets[(target_k - wavefronts.wavefronts[distance].lo_base) as usize] == target_offset {
             /*print!("Exit condition\n");
             print!("\ttarget_k_abs ({}) <= distance ({})\n", target_k_abs, distance);
