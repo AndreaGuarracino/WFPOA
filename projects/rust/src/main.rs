@@ -30,15 +30,15 @@ fn main() {
     8 (T)   7 (T) <---
     */
     alignment_result = Vec::with_capacity(9);
-    alignment_result.push((Some(0), Some(0)));
-    alignment_result.push((Some(1), Some(1)));
-    alignment_result.push((Some(2), Some(2)));
-    alignment_result.push((Some(3), Some(3)));
-    alignment_result.push((Some(4), Some(4)));
-    alignment_result.push((Some(5), Some(5)));
-    alignment_result.push((Some(6), Some(6)));
-    alignment_result.push((Some(7), None));
-    alignment_result.push((Some(8), Some(7)));
+    alignment_result.push((Some(2), Some(0)));
+    alignment_result.push((Some(3), Some(1)));
+    alignment_result.push((Some(4), Some(2)));
+    alignment_result.push((Some(5), Some(3)));
+    alignment_result.push((Some(6), Some(4)));
+    alignment_result.push((Some(7), Some(5)));
+    alignment_result.push((Some(8), Some(6)));
+    alignment_result.push((Some(9), None));
+    alignment_result.push((Some(10), Some(7)));
     let weights = vec![1; seq2.len()];
     my_graph.add_alignment(
         &alignment_result,
@@ -58,14 +58,14 @@ fn main() {
     -1      5 (C) <---
     */
     alignment_result = Vec::with_capacity(9);
-    alignment_result.push((Some(0), Some(0)));
-    alignment_result.push((Some(9), Some(1)));
-    alignment_result.push((Some(2), None));
-    alignment_result.push((Some(3), None));
-    alignment_result.push((Some(4), Some(2)));
+    alignment_result.push((Some(2), Some(0)));
+    alignment_result.push((Some(11), Some(1)));
+    alignment_result.push((Some(4), None));
     alignment_result.push((Some(5), None));
-    alignment_result.push((Some(6), Some(3)));
-    alignment_result.push((Some(8), Some(4)));
+    alignment_result.push((Some(6), Some(2)));
+    alignment_result.push((Some(7), None));
+    alignment_result.push((Some(8), Some(3)));
+    alignment_result.push((Some(10), Some(4)));
     alignment_result.push((None, Some(5)));
     let weights = vec![1; seq3.len()];
     my_graph.add_alignment(
