@@ -199,8 +199,8 @@ impl POGraph {
         if alignment.is_empty() { //  no alignment
             begin_end_node_ids = self.add_sequence(sequence, weights, 0, sequence.len());
 
-            self.add_edge(START_NODE_ID, begin_end_node_ids.0.unwrap(), 1);
-            self.add_edge(begin_end_node_ids.1.unwrap(), END_NODE_ID, 1);
+            self.add_edge(START_NODE_ID, begin_end_node_ids.0.unwrap(), weights[0]);
+            self.add_edge(begin_end_node_ids.1.unwrap(), END_NODE_ID, *weights.last().unwrap());
         } else {
             let mut valid_seq_ids: Vec<usize> = Vec::with_capacity(alignment.len());
             for align in alignment.iter() {
@@ -288,8 +288,8 @@ impl POGraph {
                 );
             }
 
-            self.add_edge(START_NODE_ID, begin_end_node_ids.0.unwrap(), 1);
-            self.add_edge(head_node_id.unwrap(), END_NODE_ID, 1);
+            self.add_edge(START_NODE_ID, begin_end_node_ids.0.unwrap(), weights[0]);
+            self.add_edge(head_node_id.unwrap(), END_NODE_ID, *weights.last().unwrap());
         }
 
         self.sequences_begin_nodes_ids.push(begin_end_node_ids.0.unwrap());
