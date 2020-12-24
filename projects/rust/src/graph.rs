@@ -76,7 +76,13 @@ impl std::fmt::Display for POGraph {
                 let edge = edge_.borrow();
 
                 graph_to_string.push_str(
-                    &format!("\t\t{} ({}) <--- {} ({})\n", node_id_to_rank[edge.end_node_id], self.nodes[edge.end_node_id].character as char, node_id_to_rank[edge.begin_node_id], self.nodes[edge.begin_node_id].character as char)
+                    &format!(
+                        "\t\t{} ({}) <--- {} ({}) - W: {}\n",
+                        node_id_to_rank[edge.end_node_id],
+                        self.nodes[edge.end_node_id].character as char,
+                        node_id_to_rank[edge.begin_node_id], self.nodes[edge.begin_node_id].character as char,
+                        edge.total_weight
+                    )
                 );
                 for label in &edge.sequence_labels {
                     graph_to_string.push_str(&format!("\t\t\tsequence_label: {}\n", label));
@@ -87,7 +93,14 @@ impl std::fmt::Display for POGraph {
                 let edge = edge_.borrow();
 
                 graph_to_string.push_str(
-                    &format!("\t\t{} ({}) ---> {} ({})\n", node_id_to_rank[edge.begin_node_id], self.nodes[edge.begin_node_id].character as char, node_id_to_rank[edge.end_node_id], self.nodes[edge.end_node_id].character as char)
+                    &format!(
+                        "\t\t{} ({}) ---> {} ({}) - W: {}\n",
+                        node_id_to_rank[edge.begin_node_id],
+                        self.nodes[edge.begin_node_id].character as char,
+                        node_id_to_rank[edge.end_node_id],
+                        self.nodes[edge.end_node_id].character as char,
+                        edge.total_weight
+                    )
                 );
                 for label in &edge.sequence_labels {
                     graph_to_string.push_str(&format!("\t\t\tsequence_label: {}\n", label));
@@ -170,15 +183,18 @@ impl POGraph {
         }
 
         let first_node_id = self.add_node(sequence[begin]);
-        let mut node_id = 0;
+        let mut prev_node_id = first_node_id;
+        let mut curr_node_id = 0;
         for i in (begin + 1)..end {
-            node_id = self.add_node(sequence[i]);
+            curr_node_id = self.add_node(sequence[i]);
 
             // both nodes contribute to edge weight
-            self.add_edge(node_id - 1, node_id, weights[i - 1] + weights[i]);
+            self.add_edge(prev_node_id, curr_node_id, weights[i - 1] + weights[i]);
+
+            prev_node_id = curr_node_id;
         }
 
-        return (Some(first_node_id), Some(node_id));
+        return (Some(first_node_id), Some(curr_node_id));
     }
 
     pub fn add_alignment(

@@ -104,32 +104,46 @@ int main(int argc, char *argv[]) {
                 weights);
     }
 
-    po_node* tmp_node;
-    po_edge* tmp_edge;
+    po_node *tmp_node;
+    po_edge *tmp_edge;
     printf("num_sequences: %d\n", graph.num_sequences);
     printf("num_nodes %d\n", graph.num_nodes);
-    for (uint32_t i = 0; i < graph.num_nodes; i++){
+    for (uint32_t i = 0; i < graph.num_nodes; i++) {
         tmp_node = graph.nodes + i;
         printf("\t%d: %c\n", tmp_node->id, tmp_node->character);
-        for (uint32_t j = 0; j < tmp_node->num_in_edges; j++){
+        for (uint32_t j = 0; j < tmp_node->num_in_edges; j++) {
             tmp_edge = tmp_node->in_edges[j];
-            printf("\t\t%d <--- %d\n", tmp_edge->end_node_id, tmp_edge->begin_node_id);
-            for (uint32_t z = 0; z < tmp_edge->num_sequence_labels; z++){
+            printf(
+                    "\t\t%d (%c) <--- %d (%c) - W: %ld\n",
+                    tmp_edge->end_node_id,
+                    graph.nodes[tmp_edge->end_node_id].character,
+                    tmp_edge->begin_node_id,
+                    graph.nodes[tmp_edge->begin_node_id].character,
+                    tmp_edge->total_weight
+            );
+            for (uint32_t z = 0; z < tmp_edge->num_sequence_labels; z++) {
                 printf("\t\t\tsequence_label: %d\n", tmp_edge->sequence_labels[z]);
             }
         }
 
-        for (uint32_t j = 0; j < tmp_node->num_out_edges; j++){
+        for (uint32_t j = 0; j < tmp_node->num_out_edges; j++) {
             tmp_edge = tmp_node->out_edges[j];
-            printf("\t\t%d ---> %d\n", tmp_edge->begin_node_id, tmp_edge->end_node_id);
-            for (uint32_t z = 0; z < tmp_edge->num_sequence_labels; z++){
+            printf(
+                    "\t\t%d (%c) ---> %d (%c) - W: %ld\n",
+                    tmp_edge->begin_node_id,
+                    graph.nodes[tmp_edge->begin_node_id].character,
+                    tmp_edge->end_node_id,
+                    graph.nodes[tmp_edge->end_node_id].character,
+                    tmp_edge->total_weight
+            );
+            for (uint32_t z = 0; z < tmp_edge->num_sequence_labels; z++) {
                 printf("\t\t\tsequence_label: %d\n", tmp_edge->sequence_labels[z]);
             }
         }
     }
 
     printf("Rank\tNodeId\n");
-    for (uint32_t i = 0; i < graph.num_nodes; i++){
+    for (uint32_t i = 0; i < graph.num_nodes; i++) {
         printf("\t%d\t%d (%c)\n", i, graph.rank_to_node_id[i], graph.nodes[graph.rank_to_node_id[i]].character);
     }
 

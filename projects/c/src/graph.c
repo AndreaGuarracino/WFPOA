@@ -134,12 +134,15 @@ int32_t po_graph_add_sequence(
     }
 
     int32_t first_node_id = po_graph_add_node(graph, sequence[begin]);
-    uint32_t node_id;
+    uint32_t prev_node_id = first_node_id;
+    uint32_t curr_node_id;
     for (uint32_t i = begin + 1; i < end; ++i) {
-        node_id = po_graph_add_node(graph, sequence[i]);
+        curr_node_id = po_graph_add_node(graph, sequence[i]);
 
         // both nodes contribute to edge weight
-        po_graph_add_edge(graph, node_id - 1, node_id, weights[i - 1] + weights[i]);
+        po_graph_add_edge(graph, prev_node_id, curr_node_id, weights[i - 1] + weights[i]);
+
+        prev_node_id = curr_node_id;
     }
 
     return first_node_id;
