@@ -70,11 +70,11 @@ fn edit_wavefronts_backtrace(
     let mut k = target_k;
     let mut distance = target_distance;
 
-    let wavefronts_slice = &mut wavefronts.wavefronts[..=target_distance];
+    let wavefronts_slice = &wavefronts.wavefronts[..=target_distance];
 
     let wavefront = &wavefronts_slice[target_distance];
 
-    let mut offset = wavefronts_slice[target_distance].offsets[(k - wavefront.lo) as usize];
+    let mut offset = wavefront.offsets[(k - wavefront.lo) as usize];
 
     wavefronts.edit_cigar_length = 0;
 
@@ -84,7 +84,6 @@ fn edit_wavefronts_backtrace(
 
         // Fetch
         let wavefront = &wavefronts_slice[distance - 1];
-        let lo = wavefront.lo;
 
         /*print!("\tdistance - 1: {}\n", distance - 1);
         print!("\t\twavefront->lo: {}\n", wavefront.lo);
@@ -98,18 +97,18 @@ fn edit_wavefronts_backtrace(
         }*/
 
         // Traceback operation
-        if wavefront.lo <= k + 1 && k + 1 <= wavefront.hi && offset == wavefront.offsets[(k + 1 + (-lo)) as usize] {
+        if wavefront.lo <= k + 1 && k + 1 <= wavefront.hi && offset == wavefront.offsets[(k + 1 + (-wavefront.lo)) as usize] {
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'D';
             wavefronts.edit_cigar_length += 1;
             k += 1;
             distance -= 1;
-        } else if wavefront.lo <= k - 1 && k - 1 <= wavefront.hi && offset == wavefront.offsets[(k - 1 + (-lo)) as usize] + 1 {
+        } else if wavefront.lo <= k - 1 && k - 1 <= wavefront.hi && offset == wavefront.offsets[(k - 1 + (-wavefront.lo)) as usize] + 1 {
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'I';
             wavefronts.edit_cigar_length += 1;
             k -= 1;
             offset -= 1;
             distance -= 1;
-        } else if wavefront.lo <= k && k <= wavefront.hi && offset == wavefront.offsets[(k + (-lo)) as usize] + 1 {
+        } else if wavefront.lo <= k && k <= wavefront.hi && offset == wavefront.offsets[(k + (-wavefront.lo)) as usize] + 1 {
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'X';
             wavefronts.edit_cigar_length += 1;
             distance -= 1;
@@ -140,8 +139,8 @@ fn edit_wavefronts_extend_wavefront(
     // Parameters
     let k_min = wavefront.lo;
 
-    // Extend diagonally each wavefront point
-    for (i, offset) in wavefront.offsets.iter_mut().skip((k_min + (-wavefront.lo)) as usize).take((wavefront.hi - wavefront.lo + 1) as usize).enumerate() {
+    // Extend diagonally each wavefront point (with take the execution times are slightly better)
+    for (i, offset) in wavefront.offsets.iter_mut().take((wavefront.hi - wavefront.lo + 1) as usize).enumerate() {
         let mut v = ewavefront_v!(i as isize + k_min, *offset as isize) as usize; // offsets[k]-k
         let mut h = ewavefront_h!(i as isize + k_min, *offset as isize) as usize; // offsets[k]
 
@@ -182,18 +181,19 @@ fn edit_wavefronts_compute_wavefront(
     );
     // Allocate wavefront
     wavefronts.wavefronts_allocated += 1; // Next
-    //wavefronts.wavefronts_allocated += 1;
     /*print!("\t\tedit_wavefronts->wavefronts_allocated: {}\n", wavefronts.wavefronts_allocated);
     print!("\t---------------\n");*/
+
+    let hi_minus_lo = (wf_prec.hi - wf_prec.lo) as usize;
 
     // Fetch offsets
 
     // Loop peeling (k=lo-1); there is only the Upper DP cell (there are no Mid and Lower cells)
-    wf_succ.offsets[(wf_prec.lo - 1 + (-wf_succ.lo)) as usize] = wf_prec.offsets[(wf_prec.lo + (-wf_prec.lo)) as usize];
+    wf_succ.offsets[0] = wf_prec.offsets[0];
 
-    // Loop peeling (k=lo)
-    let bottom_upper_del = if (wf_prec.lo + 1) <= wf_prec.hi { wf_prec.offsets[(wf_prec.lo + 1 + (-wf_prec.lo)) as usize] } else { -1 };
-    wf_succ.offsets[(wf_prec.lo + (-wf_succ.lo)) as usize] = max!(wf_prec.offsets[(wf_prec.lo + (-wf_prec.lo)) as usize] + 1, bottom_upper_del);
+    // Loop peeling (k=lo) ((wf_prec.lo + 1) <= wf_prec.hi)
+    let bottom_upper_del = if hi_minus_lo >= 1 { wf_prec.offsets[1] } else { -1 };
+    wf_succ.offsets[1] = max!(wf_prec.offsets[0] + 1, bottom_upper_del);
 
     /*print!("\t\tlo - 1, next_wavefront[{}]->next_offsets[{}]: {}\n", distance, lo - 1, wf_succ.offsets[(lo - 1 + (-wf_succ.lo)) as usize]);
     //print!("\t\tlo - 1, wavefront[{}]->offsets[{}]: {}\n", distance - 1, lo - 1, wf_prec.offsets[(lo - 1 + (-wf_prec.lo)) as usize]);
@@ -201,26 +201,26 @@ fn edit_wavefronts_compute_wavefront(
     print!("\t\tlo    , wavefront[{}]->offsets[{}]: {}\n", distance - 1, lo, wf_prec.offsets[(lo + (-wf_prec.lo)) as usize]);*/
 
     // Compute next wavefront starting point
-    for k in (wf_prec.lo + 1)..=(wf_prec.hi - 1) {
+    for i_k in 1..hi_minus_lo {
         /*
          *           deletion <-- wf_prec.offsets[k + 1];     // Upper
          *       substitution <-- wf_prec.offsets[k] + 1;     // Mid
          *          insertion <-- wf_prec.offsets[k - 1] + 1; // Lower
          * wf_succ.offsets[k] <-- MAX(substitution, insertion, deletion); // MAX
          */
-        let max_ins_sub = max!(wf_prec.offsets[(k + (-wf_prec.lo)) as usize], wf_prec.offsets[(k - 1 + (-wf_prec.lo)) as usize]) + 1;
-        wf_succ.offsets[(k + (-wf_succ.lo)) as usize] = max!(max_ins_sub, wf_prec.offsets[(k + 1 + (-wf_prec.lo)) as usize]);
+        let max_ins_sub = max!(wf_prec.offsets[i_k], wf_prec.offsets[i_k - 1]) + 1;
+        wf_succ.offsets[i_k + 1] = max!(max_ins_sub, wf_prec.offsets[i_k + 1]);
 
         /*print!("\t\t - next_wavefront[{}]->next_offsets[{}]: {}\n", distance, k, wf_succ.offsets[(k + (-wf_succ.lo)) as usize]);
         print!("\t\t - wavefront[{}]->offsets[{}]: {}\n", distance - 1, k, wf_prec.offsets[(k + (-lo)) as usize]);*/
     }
 
-    // Loop peeling (k=hi)
-    let top_lower_ins = if wf_prec.lo <= (wf_prec.hi - 1) { wf_prec.offsets[(wf_prec.hi - 1 + (-wf_prec.lo)) as usize] } else { -1 };
-    wf_succ.offsets[(wf_prec.hi + (-wf_succ.lo)) as usize] = max!(wf_prec.offsets[(wf_prec.hi + (-wf_prec.lo)) as usize], top_lower_ins) + 1;
+    // Loop peeling (k=hi) (wf_prec.lo <= (wf_prec.hi - 1))
+    let top_lower_ins = if hi_minus_lo >= 1 { wf_prec.offsets[hi_minus_lo - 1] } else { -1 };
+    wf_succ.offsets[hi_minus_lo + 1] = max!(wf_prec.offsets[hi_minus_lo], top_lower_ins) + 1;
 
     // Loop peeling (k=hi+1); there is only the Lower DP cell (there are no Mid and Upper cells)
-    wf_succ.offsets[(wf_prec.hi + 1 + (-wf_succ.lo)) as usize] = wf_prec.offsets[(wf_prec.hi + (-wf_prec.lo)) as usize] + 1;
+    wf_succ.offsets[hi_minus_lo + 2] = wf_prec.offsets[hi_minus_lo] + 1;
 
     /*print!("\t\thi    , next_wavefront[{}]->next_offsets[{}]: {}\n", distance, hi, wf_succ.offsets[(hi + (-wf_succ.lo)) as usize]);
     print!("\t\thi    , wavefront[{}]->offsets[{}]: {}\n", distance - 1, hi, wf_prec.offsets[(hi + (-wf_prec.lo)) as usize]);
