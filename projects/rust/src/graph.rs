@@ -1,8 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub const START_NODE_ID: usize = 0;
-pub const END_NODE_ID: usize = 1;
+use fxhash::FxHashMap;
+
+use std::fs::File;
+use std::io::{LineWriter, Write};
+
+//pub const START_NODE_ID: usize = 0;
+//pub const END_NODE_ID: usize = 1;
 
 pub type Alignment = Vec<(Option<usize>, Option<usize>)>;
 
@@ -67,8 +72,8 @@ impl std::fmt::Display for POGraph {
             node_id_to_rank[self.rank_to_node_id[rank]] = rank;
         }
 
-        for rank in 0..self.nodes.len() {
-            let node = &self.nodes[self.rank_to_node_id[rank]];
+        for node_id in &self.rank_to_node_id {
+            let node = &self.nodes[*node_id];
 
             graph_to_string.push_str(&format!("\t{}: {}\n", node.id, node.character as char));
 
@@ -119,14 +124,14 @@ impl std::fmt::Display for POGraph {
 impl POGraph {
     pub fn new(num_initial_sequences: usize, num_initial_nodes: usize) -> POGraph {
         let mut graph = POGraph {
-            nodes: Vec::with_capacity(num_initial_nodes + 2),
-            rank_to_node_id: Vec::with_capacity(num_initial_nodes + 2),
+            nodes: Vec::with_capacity(num_initial_nodes/* + 2*/),
+            rank_to_node_id: Vec::with_capacity(num_initial_nodes/* + 2*/),
             sequences_begin_nodes_ids: Vec::with_capacity(num_initial_sequences),
             consensus: Vec::with_capacity(num_initial_nodes),
         };
 
-        graph.add_node(b'S');
-        graph.add_node(b'E');
+        //graph.add_node(b'S');
+        //graph.add_node(b'E');
 
         return graph;
     }
@@ -314,7 +319,7 @@ impl POGraph {
     }
 
     // Kahn’s algorithm
-    fn topological_sort(&mut self) {
+    fn topological_sort_DFS(&mut self) {
         // todo try to re-use memory and eventually shrink it later, or push new elements
         self.rank_to_node_id.clear();
         self.rank_to_node_id = Vec::with_capacity(self.nodes.len());
@@ -325,10 +330,11 @@ impl POGraph {
             in_degree[node.id] = node.in_edges.len();
         }
 
-        let mut node_ids_queue = vec![START_NODE_ID; 1];
-
         // Initialize count of visited vertices
         let mut num_visited_vertices: usize = 0;
+
+        //let mut node_ids_queue = vec![START_NODE_ID; 1];
+        let mut node_ids_queue = vec![0; 1];
 
         while !node_ids_queue.is_empty() {
             let node_id = node_ids_queue.pop().unwrap();
@@ -352,9 +358,52 @@ impl POGraph {
         //debug_assert!(self.is_topologically_sorted());
     }
 
-    fn _topological_sort(&mut self) {
+    fn _topological_sort_abpoa(&mut self) {
         // todo try to re-use memory and eventually shrink it later, or push new elements
-        self.rank_to_node_id.clear();
+        self.rank_to_node_id = vec![0; self.nodes.len()];
+        //self.node_id_to_rank = vec![0; self.nodes.len()];
+
+        let mut rank = 0;
+
+        // O(V)
+        let mut in_degree = vec![0; self.nodes.len()];
+        for node in &self.nodes {
+            in_degree[node.id] = node.in_edges.len();
+        }
+
+        let mut node_ids_queue = vec![0; 1];
+
+        // Breadth-First-Search
+        while !node_ids_queue.is_empty() {
+            let node_id = node_ids_queue.pop().unwrap();
+
+            self.rank_to_node_id[rank] = node_id;
+            //self.node_id_to_rank[node_id] = rank;
+            rank += 1;
+
+            for edge_ in &self.nodes[node_id].out_edges {
+                let end_node_id = edge_.borrow().end_node_id;
+                in_degree[end_node_id] -= 1;
+
+                if in_degree[end_node_id] == 0 {
+                    let mut add_nodes = true;
+                    for aligned_node_id in &self.nodes[end_node_id].aligned_nodes_ids {
+                        if in_degree[*aligned_node_id] != 0 {
+                            add_nodes = false;
+                            break;
+                        }
+                    }
+                    if add_nodes {
+                        node_ids_queue.push(end_node_id);
+                        node_ids_queue.extend(self.nodes[end_node_id].aligned_nodes_ids.iter());
+                    }
+                }
+            }
+        }
+    }
+
+    fn topological_sort(&mut self) {
+        // todo try to re-use memory and eventually shrink it later, or push new elements
         self.rank_to_node_id = Vec::with_capacity(self.nodes.len());
 
         // 0 - unmarked, 1 - temporarily marked, 2 - permanently marked
@@ -435,55 +484,56 @@ impl POGraph {
         return true;
     }
 
+    // It assumes consecutive ranks for the aligned nodes
     fn initialize_multiple_sequence_alignment(&self) -> (usize, Vec<usize>) {
-        let max_rank = self.nodes.len() - 1;
+        let num_nodes_minus_1 = self.nodes.len() - 1;
 
-        let mut node_id_to_msa_rank = vec![0; self.nodes.len()];
+        let mut node_id_to_msa_column = vec![0; self.nodes.len()];
 
-        let mut msa_id: usize = 0;
         let mut i = 0;
+        let mut column = 0;
         loop {
             let node_id = self.rank_to_node_id[i];
 
-            node_id_to_msa_rank[node_id] = msa_id;
+            node_id_to_msa_column[node_id] = column;
 
-            for _ in 0..self.nodes[node_id].aligned_nodes_ids.len() {
+            for aligned_node_id in &self.nodes[node_id].aligned_nodes_ids {
+                node_id_to_msa_column[*aligned_node_id] = column;
                 i += 1;
-                node_id_to_msa_rank[self.rank_to_node_id[i]] = msa_id;
             }
 
-            msa_id += 1;
-
-            if i >= max_rank {
+            if i >= num_nodes_minus_1 {
                 break;
             }
+
             i += 1;
+            column += 1;
         }
 
-        return (msa_id, node_id_to_msa_rank);
+        return (column + 1, node_id_to_msa_column);
     }
 
     pub fn generate_multiple_sequence_alignment(
         &mut self,
         include_consensus: &bool,
     ) -> (usize, Vec<Vec<u8>>) {
-        let (msa_len, node_id_to_msa_rank) = self.initialize_multiple_sequence_alignment();
+        let (msa_len, node_id_to_msa_column) = self.initialize_multiple_sequence_alignment();
 
         let num_sequences = self.sequences_begin_nodes_ids.len() + if *include_consensus { 1 } else { 0 };
 
         let mut msa_seq = vec![vec![b'-'; msa_len]; num_sequences];
-        // extract sequences from graph and create msa strings (add indels(-) where necessary)
 
-        for i in 0..self.sequences_begin_nodes_ids.len() {
-            msa_seq[i][0] = b'S';
+        // Extract sequences from graph and create MSA strings
+        for label in 0..self.sequences_begin_nodes_ids.len() {
+            //msa_seq[i][0] = b'S';
 
-            let mut node_id = self.sequences_begin_nodes_ids[i];
+            let mut node_id = self.sequences_begin_nodes_ids[label];
 
             loop {
-                msa_seq[i][node_id_to_msa_rank[node_id]] = self.nodes[node_id].character.clone();
+                msa_seq[label][node_id_to_msa_column[node_id]] = self.nodes[node_id].character;
 
-                match self.nodes[node_id].successor(&(i as u32)) {
-                    Some(new_node_id) => node_id = new_node_id,
+                node_id = match self.nodes[node_id].successor(&(label as u32)) {
+                    Some(new_node_id) => new_node_id,
                     None => break
                 }
             }
@@ -494,7 +544,7 @@ impl POGraph {
             self.traverse_heaviest_bundle();
 
             for node_id in &self.consensus {
-                msa_seq[num_sequences - 1][node_id_to_msa_rank[*node_id]] = self.nodes[*node_id].character.clone();
+                msa_seq[num_sequences - 1][node_id_to_msa_column[*node_id]] = self.nodes[*node_id].character;
             }
         }
 
@@ -615,5 +665,117 @@ impl POGraph {
         self.consensus.push(max_score_id);
 
         self.consensus.reverse();
+    }
+
+    pub fn graph_2_dot(&self) -> std::io::Result<()> {
+        /*
+        // all settings
+        // float dpi_size = 3000, graph_width = 100, graph_height = 6;
+         */
+
+        let font_size = 22;
+
+        let mut node_color = FxHashMap::with_capacity_and_hasher(5, Default::default());
+        node_color.insert(b'A', "lightskyblue");
+        node_color.insert(b'C', "salmon");
+        node_color.insert(b'G', "lightgoldenrod");
+        node_color.insert(b'T', "limegreen");
+        node_color.insert(b'N', "gray");
+
+        let mut node_label = FxHashMap::with_capacity_and_hasher(5, Default::default());
+
+        let node_width = 1.2;
+        let rankdir = "LR";
+        let node_style = "filled";
+        let node_fixedsize = "true";
+        let node_shape = "circle";
+
+        let show_aligned_mismatch = true;
+
+        let mut graph_to_dot = format!("// wfpoa dot file\n//{} nodes.\n", self.nodes.len());
+        // fprintf(fp, "digraph ABPOA_graph {\n\tgraph [dpi=%f]; size=\"%f,%f\";\n\trankdir=\"%s\";\n\tnode [width=%f, style=%s, fixedsize=%s, shape=%s];\n", dpi_size, graph_width, graph_height, rankdir, node_width, node_style, node_fixedsize, node_shape);
+        graph_to_dot.push_str(&format!(
+            "digraph WFPOA_graph {{\n\tgraph [rankdir=\"{}\"];\n\tnode [width={}, style={}, fixedsize={}, shape={}];\n", rankdir, node_width, node_style, node_fixedsize, node_shape
+        ));
+
+        // Prepare node labels and write node color and fontsize
+        for (rank, node_id) in self.rank_to_node_id.iter().enumerate() {
+            let node = &self.nodes[*node_id];
+
+            node_label.insert(node_id, format!("{} ({})\nr: {}", node.character as char, node_id, rank));
+
+            graph_to_dot.push_str(&format!(
+                "\"{}\" [color={}, fontsize={}]\n", node_label[node_id], node_color[&node.character], font_size
+            ));
+        }
+
+        let mut node_id_to_rank = Vec::new();
+        if show_aligned_mismatch {
+            node_id_to_rank = vec![0; self.nodes.len()];
+            for i in 0..self.nodes.len() {
+                node_id_to_rank[self.rank_to_node_id[i]] = i;
+            }
+        }
+
+        let mut x_index = 0;
+        for (rank, node_id) in self.rank_to_node_id.iter().enumerate() {
+            let node = &self.nodes[*node_id];
+
+            for edge_ in &node.out_edges {
+                let edge = edge_.borrow();
+                let out_weight = edge.sequence_labels.len();//abg->node[id].out_weight[j]+1
+
+                graph_to_dot.push_str(&format!(
+                    "\t\"{}\" -> \"{}\" [label=\"{}\", penwidth={}]\n", node_label[node_id], node_label[&edge.end_node_id], out_weight, out_weight + 1
+                ));
+            }
+
+            if node.aligned_nodes_ids.len() > 0 {
+                graph_to_dot.push_str(&format!(
+                    "\t{{rank=same; \"{}\" ", node_label[node_id]
+                ));
+                for aligned_node_id in &node.aligned_nodes_ids {
+                    graph_to_dot.push_str(&format!(
+                        "\"{}\" ", node_label[aligned_node_id]
+                    ));
+                }
+                graph_to_dot.push_str(&format!(
+                    "}};\n"
+                ));
+
+                if show_aligned_mismatch {
+                    if rank > x_index {
+                        x_index = rank;
+
+                        // mismatch dashed line
+                        graph_to_dot.push_str(&format!(
+                            "\t{{ edge [style=dashed, arrowhead=none]; \"{}\" ", node_label[node_id]
+                        ));
+
+                        for aligned_node_id in &node.aligned_nodes_ids {
+                            graph_to_dot.push_str(&format!(
+                                "-> \"{}\" ", node_label[aligned_node_id]
+                            ));
+
+                            let index = node_id_to_rank[*aligned_node_id];
+                            if index > x_index {
+                                x_index = index;
+                            }
+                        }
+
+                        graph_to_dot.push_str(&format!(
+                            "}}\n"
+                        ));
+                    }
+                }
+            }
+        }
+        graph_to_dot.push_str(&format!(
+            "}}\n"
+        ));
+
+        let file = File::create("WFPOA_graph.dot")?;
+        let mut file = LineWriter::new(file);
+        file.write_all(graph_to_dot.as_bytes())
     }
 }
