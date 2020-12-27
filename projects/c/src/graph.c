@@ -391,29 +391,33 @@ bool is_topologically_sorted(po_graph *const graph) {
 
 uint32_t initialize_multiple_sequence_alignment(
         po_graph *const graph,
-        uint32_t **node_id_to_msa_rank) {
-    uint32_t *_node_id_to_msa_rank = calloc(graph->num_nodes, sizeof(uint32_t));
+        uint32_t **node_id_to_msa_column) {
+    uint32_t *_node_id_to_msa_column = calloc(graph->num_nodes, sizeof(uint32_t));
 
     uint32_t node_id;
     uint32_t num_aligned_nodes_ids;
+    uint32_t* aligned_nodes_ids;
 
-    uint32_t msa_id = 0;
+    uint32_t column = 0;
     for (uint32_t i = 0; i < graph->num_nodes; ++i) {
         node_id = graph->rank_to_node_id[i];
 
-        _node_id_to_msa_rank[node_id] = msa_id;
+        _node_id_to_msa_column[node_id] = column;
 
         num_aligned_nodes_ids = (graph->nodes + node_id)->num_aligned_nodes_ids;
-        for (uint32_t j = 0; j < num_aligned_nodes_ids; ++j) {
-            _node_id_to_msa_rank[graph->rank_to_node_id[++i]] = msa_id;
+        aligned_nodes_ids = (graph->nodes + node_id)->aligned_nodes_ids;
+
+        for (uint32_t z = 0; z < num_aligned_nodes_ids; ++z) {
+            _node_id_to_msa_column[aligned_nodes_ids[z]] = column;
+            ++i;
         }
 
-        ++msa_id;
+        ++column;
     }
 
-    *node_id_to_msa_rank = _node_id_to_msa_rank;
+    *node_id_to_msa_column = _node_id_to_msa_column;
 
-    return msa_id;
+    return column;
 }
 
 void generate_multiple_sequence_alignment(
@@ -422,8 +426,8 @@ void generate_multiple_sequence_alignment(
         bool include_consensus) {
 
     // assign msa rank to each node
-    uint32_t *node_id_to_msa_rank = NULL;
-    *msa_len = initialize_multiple_sequence_alignment(graph, &node_id_to_msa_rank);
+    uint32_t *node_id_to_msa_column = NULL;
+    *msa_len = initialize_multiple_sequence_alignment(graph, &node_id_to_msa_column);
 
     uint32_t i, j;
     uint32_t node_id;
@@ -438,12 +442,12 @@ void generate_multiple_sequence_alignment(
         }
     }
 
-    // extract sequences from graph and create msa strings (add indels(-) where necessary)
+    // Extract sequences from graph and create MSA strings
     for (i = 0; i < graph->num_sequences; ++i) {
         node_id = graph->sequences_begin_nodes_ids[i];
 
         while (true) {
-            _msa_seq[i][node_id_to_msa_rank[node_id]] = (graph->nodes + node_id)->character;
+            _msa_seq[i][node_id_to_msa_column[node_id]] = (graph->nodes + node_id)->character;
 
             if (!po_node_successor(graph->nodes + node_id, &node_id, i)) {
                 break;
@@ -458,7 +462,7 @@ void generate_multiple_sequence_alignment(
         for (i = 0; i < graph->consensus_len; ++i) {
             node_id = graph->consensus[i];
 
-            _msa_seq[graph->num_sequences][node_id_to_msa_rank[node_id]] = (graph->nodes + node_id)->character;
+            _msa_seq[graph->num_sequences][node_id_to_msa_column[node_id]] = (graph->nodes + node_id)->character;
         }
     }
 

@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
         8 (T)   7 (T) <---
         */
         alignment_result.num_pairs = 9;
-        alignment_result.aligned_pairs = malloc(9 * sizeof(pair));
+        alignment_result.aligned_pairs = malloc(alignment_result.num_pairs * sizeof(pair));
         alignment_result.aligned_pairs[0].first = 0;
         alignment_result.aligned_pairs[0].second = 0;
         alignment_result.aligned_pairs[1].first = 1;
@@ -76,8 +76,8 @@ int main(int argc, char *argv[]) {
         8 (T)   4 (T) <---
         -1       5 (C) <---
         */
-        alignment_result.num_pairs = 9;
-        alignment_result.aligned_pairs = malloc(9 * sizeof(pair));
+        alignment_result.num_pairs = 8;
+        alignment_result.aligned_pairs = malloc(alignment_result.num_pairs * sizeof(pair));
         alignment_result.aligned_pairs[0].first = 0;
         alignment_result.aligned_pairs[0].second = 0;
         alignment_result.aligned_pairs[1].first = 9;
@@ -89,13 +89,11 @@ int main(int argc, char *argv[]) {
         alignment_result.aligned_pairs[4].first = 4;
         alignment_result.aligned_pairs[4].second = 2;
         alignment_result.aligned_pairs[5].first = 5;
-        alignment_result.aligned_pairs[5].second = -1;
+        alignment_result.aligned_pairs[5].second = 3;
         alignment_result.aligned_pairs[6].first = 6;
-        alignment_result.aligned_pairs[6].second = 3;
+        alignment_result.aligned_pairs[6].second = 4;
         alignment_result.aligned_pairs[7].first = 8;
-        alignment_result.aligned_pairs[7].second = 4;
-        alignment_result.aligned_pairs[8].first = -1;
-        alignment_result.aligned_pairs[8].second = 5;
+        alignment_result.aligned_pairs[7].second = 5;
 
         po_graph_add_alignment(
                 &graph,

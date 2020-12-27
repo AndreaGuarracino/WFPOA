@@ -13,3 +13,6 @@ opt-level = 3
 lto = "thin"
 
 [dependencies]
+# Hashing algorithms
+fxhash = "0.2.1"
+#fnv = "1.0.7"

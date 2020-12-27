@@ -61,69 +61,69 @@ typedef struct {
 } po_graph;
 
 bool po_node_successor(
-        po_node *const node,
+        po_node *node,
         uint32_t *node_id,
         uint32_t label);
 
 void po_edge_add_sequence(
-        po_edge *const edge,
+        po_edge *edge,
         uint32_t label,
         uint32_t weight
 );
 
 void po_graph_init(
-        po_graph *const graph,
-        const uint32_t num_initial_nodes
+        po_graph *graph,
+        uint32_t num_initial_nodes
 );
 
 void po_graph_create_and_init_node(
-        po_node *const node,
+        po_node *node,
         uint32_t id,
-        const char character
+        char character
 );
 
 uint32_t po_graph_add_node(
-        po_graph *const graph,
+        po_graph *graph,
         char character);
 
 void po_graph_add_edge(
-        po_graph *const wf_graph,
+        po_graph *wf_graph,
         uint32_t begin_node_id, uint32_t end_node_id,
         uint32_t weight);
 
 int32_t po_graph_add_sequence(
-        po_graph *const wf_graph,
+        po_graph *wf_graph,
         const char *sequence,
         const uint32_t *weights,
         uint32_t begin, uint32_t end);
 
 void po_graph_add_alignment(
-        po_graph *const wf_graph,
+        po_graph *wf_graph,
         const alignment *alignment,
         const char *sequence, uint32_t sequence_size,
         const uint32_t *weights);
 
-void topological_sort(po_graph *const graph);
+void topological_sort(po_graph *graph);
 
-bool is_topologically_sorted(po_graph *const graph);
+bool is_topologically_sorted(po_graph *graph);
 
 uint32_t initialize_multiple_sequence_alignment(
-        po_graph *const graph,
-        uint32_t **node_id_to_msa_id);
+        po_graph *graph,
+        uint32_t **node_id_to_msa_column);
 
 void generate_multiple_sequence_alignment(
-        po_graph *const graph,
+        po_graph *graph,
         char ***msa_seq, uint32_t *msa_len,
         bool include_consensus);
 
 uint32_t po_graph_branch_completion(
-        po_graph *const graph,
+        po_graph *graph,
         int64_t *scores,
         int32_t *predecessors,
         uint32_t rank);
 
 void po_graph_traverse_heaviest_bundle(
-        po_graph *const graph
+        po_graph *graph
 );
 
 #endif //WFPOA_GRAPH_H
