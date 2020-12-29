@@ -97,19 +97,27 @@ fn edit_wavefronts_backtrace(
             print!("\t\toffsets[{}]: {}\n", k + 1, wavefront.offsets[(k + 1 + (-lo)) as usize]);
         }*/
 
+        let i_k = k - wavefront.lo;
+
         // Traceback operation
-        if wavefront.lo <= k + 1 && k + 1 <= wavefront.hi && offset == wavefront.offsets[&(k + 1)] {
+        if -1 <= i_k && k + 1 <= wavefront.hi && offset == wavefront.offsets[&(k + 1)] {
+            // if wavefront.lo <= k + 1 && k + 1 <= wavefront.hi
+
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'D';
             wavefronts.edit_cigar_length += 1;
             k += 1;
             distance -= 1;
-        } else if wavefront.lo <= k - 1 && k - 1 <= wavefront.hi && offset == wavefront.offsets[&(k - 1)] + 1 {
+        } else if 1 <= i_k && k - 1 <= wavefront.hi && offset == wavefront.offsets[&(k - 1)] + 1 {
+            // wavefront.lo <= k - 1 && k - 1 <= wavefront.hi
+
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'I';
             wavefronts.edit_cigar_length += 1;
             k -= 1;
             offset -= 1;
             distance -= 1;
-        } else if wavefront.lo <= k && k <= wavefront.hi && offset == wavefront.offsets[&k] + 1 {
+        } else if 0 <= i_k && k <= wavefront.hi && offset == wavefront.offsets[&k] + 1 {
+            // wavefront.lo <= k && k <= wavefront.hi
+
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'X';
             wavefronts.edit_cigar_length += 1;
             distance -= 1;
@@ -137,13 +145,14 @@ fn edit_wavefronts_extend_wavefront(
     text: &[u8], text_length: usize,
     _distance: usize,
 ) {
+    //print!("\tedit_wavefronts_extend_wavefront\n");
+
     // Extend diagonally each wavefront point
     for (k, offset) in wavefront.offsets.iter_mut() {
         let mut v = ewavefront_v!(*k, *offset as isize) as usize; // offsets[k]-k
         let mut h = ewavefront_h!(*k, *offset as isize) as usize; // offsets[k]
 
-        /*print!("\tedit_wavefronts_extend_wavefront\n");
-        print!("\t\tk: {}\n", k);*/
+        //print!("\t\tk: {}\n", k);
         while v < pattern_length && h < text_length && pattern[v] == text[h] {
             //print!("{}\t{}\t{}\t{}\t{}\tM\t{}\t{}\n", v, h, *offset, _distance, k, pattern[v] as char, text[h] as char);
             /*print!("\t\t\twavefronts[{}]->offsets[{}]: {}\n", _distance, k, offset);
@@ -266,9 +275,8 @@ fn edit_wavefronts_align(
             wavefronts.wavefronts[distance].offsets[&(target_k)] == target_offset {
             /*print!("Exit condition\n");
             print!("\tdistance ({}) >= target_k_abs ({})\n", distance, target_k_abs);
-            print!("\twavefronts[{}]->offsets[{}] ({}) == target_offset ({})\n",
-                   distance, target_k_abs,
-                   wavefronts.wavefronts[distance].offsets[(target_k - wavefronts.wavefronts[distance].lo) as usize],
+            print!("\twavefronts[{}]->offsets[{}] == target_offset ({})\n",
+                   distance, wavefronts.wavefronts[distance].offsets[&(target_k)],
                    target_offset
             );*/
 
@@ -297,7 +305,6 @@ fn edit_wavefronts_clean(
     }
     wavefronts.wavefronts_allocated = 0;
 }
-
 
 fn edit_wavefronts_allocate_wavefront(
     wavefront: &mut EditWavefrontT,

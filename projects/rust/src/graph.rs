@@ -6,8 +6,8 @@ use fxhash::FxHashMap;
 use std::fs::File;
 use std::io::{LineWriter, Write};
 
-//pub const START_NODE_ID: usize = 0;
-//pub const END_NODE_ID: usize = 1;
+const START_NODE_ID: usize = 0;
+//const END_NODE_ID: usize = 1;
 
 pub type Alignment = Vec<(Option<usize>, Option<usize>)>;
 
@@ -41,6 +41,7 @@ impl PONode {
     pub fn successor(&self, label: &u32) -> Option<usize> {
         for edge_ in self.out_edges.iter() {
             let edge = edge_.borrow();
+
             for current_label in edge.sequence_labels.iter() {
                 if current_label == label {
                     return Some(edge.end_node_id);
@@ -57,6 +58,7 @@ pub struct POGraph {
 
     rank_to_node_id: Vec<usize>,
 
+    // ToDo: if a START_NODE will be used, replace this vector with the START_NODE's outgoing edges
     sequences_begin_nodes_ids: Vec<usize>,
 
     consensus: Vec<usize>,
@@ -123,7 +125,7 @@ impl std::fmt::Display for POGraph {
 
 impl POGraph {
     pub fn new(num_initial_sequences: usize, num_initial_nodes: usize) -> POGraph {
-        let mut graph = POGraph {
+        let graph = POGraph {
             nodes: Vec::with_capacity(num_initial_nodes/* + 2*/),
             rank_to_node_id: Vec::with_capacity(num_initial_nodes/* + 2*/),
             sequences_begin_nodes_ids: Vec::with_capacity(num_initial_sequences),
@@ -214,115 +216,114 @@ impl POGraph {
         }
         //#endif
 
-        debug_assert_eq!(sequence.len(), weights.len(), "[wfpoa::POGraph::add_alignment] error: sequence and weights are of unequal size!");
+        debug_assert_eq!(sequence.len(), weights.len(), "[wfpoa::POGraph::add_alignment] error: sequence and weights are of unequal size");
 
-        let mut begin_end_node_ids;
+        let mut begin_node_id;
         if alignment.is_empty() { //  no alignment
-            begin_end_node_ids = self.add_sequence(sequence, weights, 0, sequence.len());
+            let begin_end_node_ids = self.add_sequence(sequence, weights, 0, sequence.len());
+            begin_node_id = begin_end_node_ids.0;
 
-            self.add_edge(START_NODE_ID, begin_end_node_ids.0.unwrap(), weights[0]);
-            self.add_edge(begin_end_node_ids.1.unwrap(), END_NODE_ID, *weights.last().unwrap());
+            //self.add_edge(begin_end_node_ids.1.unwrap(), END_NODE_ID, *weights.last().unwrap());
         } else {
             let mut valid_seq_ids: Vec<usize> = Vec::with_capacity(alignment.len());
             for align in alignment.iter() {
                 if let Some(seq_id) = align.1 {
+                    debug_assert!(seq_id < sequence.len(), "[wfpoa::POGraph::add_alignment] error: invalid alignment");
+
                     valid_seq_ids.push(seq_id);
                 }
             }
 
-            debug_assert!(valid_seq_ids[0] <= sequence.len());
-            debug_assert!(*valid_seq_ids.last().unwrap() + 1 <= sequence.len());
+            debug_assert!(!valid_seq_ids.is_empty(), "[wfpoa::POGraph::add_alignment] error: missing sequence in the alignment");
 
-            let tmp = self.nodes.len();
-            self.add_sequence(sequence, weights, 0, valid_seq_ids[0]);
-            let mut head_node_id = if tmp == self.nodes.len() { None } else { Some(self.nodes.len() - 1) };
+            // Add unaligned bases
+            let begin_end_node_ids = self.add_sequence(sequence, weights, 0, valid_seq_ids[0]);
+            begin_node_id = begin_end_node_ids.0;
+            let mut prev_node_id = begin_end_node_ids.1;
 
-            begin_end_node_ids = self.add_sequence(
+            let last_node_id = self.add_sequence(
                 sequence, weights,
                 *valid_seq_ids.last().unwrap() + 1, sequence.len(),
-            );
+            ).0;
 
-            let mut prev_weight = match head_node_id {
-                Some(_) => weights[valid_seq_ids[0] - 1],
-                None => 0,
-            };
-
-            let mut new_node_id: Option<usize>;
+            // Add aligned bases
+            let mut curr_node_id: Option<usize>;
             for (node_id, seq_id) in alignment.iter() {
                 if let Some(seq_id) = seq_id {
                     let letter = sequence[*seq_id];
+
                     if let Some(node_id) = node_id {
                         if self.nodes[*node_id].character == letter {
-                            new_node_id = Some(*node_id);
+                            curr_node_id = Some(*node_id);
                         } else {
-                            let mut aligned_to_node_id: Option<usize> = None;
+                            curr_node_id = None;
                             for aligned_node_id in self.nodes[*node_id].aligned_nodes_ids.iter() {
                                 if self.nodes[*aligned_node_id].character == letter {
-                                    aligned_to_node_id = Some(*aligned_node_id);
+                                    curr_node_id = Some(*aligned_node_id);
                                     break;
                                 }
                             }
 
-                            if aligned_to_node_id == None {
-                                new_node_id = Some(self.add_node(letter));
+                            if curr_node_id == None {
+                                curr_node_id = Some(self.add_node(letter));
 
                                 // todo: I don't like to copy everything to avoid borrowing problems in the for
                                 let aligned_nodes_ids = self.nodes[*node_id].aligned_nodes_ids.to_vec();
 
                                 for aligned_node_id in aligned_nodes_ids.iter() {
-                                    self.nodes[new_node_id.unwrap()].aligned_nodes_ids.push(*aligned_node_id);
-                                    self.nodes[*aligned_node_id].aligned_nodes_ids.push(new_node_id.unwrap());
+                                    self.nodes[curr_node_id.unwrap()].aligned_nodes_ids.push(*aligned_node_id);
+                                    self.nodes[*aligned_node_id].aligned_nodes_ids.push(curr_node_id.unwrap());
                                 }
 
-                                self.nodes[new_node_id.unwrap()].aligned_nodes_ids.push(*node_id);
-                                self.nodes[*node_id].aligned_nodes_ids.push(new_node_id.unwrap());
-                            } else {
-                                new_node_id = aligned_to_node_id;
+                                self.nodes[curr_node_id.unwrap()].aligned_nodes_ids.push(*node_id);
+                                self.nodes[*node_id].aligned_nodes_ids.push(curr_node_id.unwrap());
                             }
                         }
                     } else {
-                        new_node_id = Some(self.add_node(letter));
+                        curr_node_id = Some(self.add_node(letter));
                     }
 
-                    if begin_end_node_ids.0 == None {
-                        begin_end_node_ids.0 = new_node_id;
+                    if begin_node_id == None {
+                        begin_node_id = curr_node_id;
                     }
 
-                    if let Some(head_node_id) = head_node_id {
-                        // both nodes contribute to edge weight
+                    if let Some(prev_node_id) = prev_node_id {
+                        // Both nodes contribute to edge weight
                         self.add_edge(
-                            head_node_id, new_node_id.unwrap(),
-                            prev_weight + weights[*seq_id],
+                            prev_node_id, curr_node_id.unwrap(),
+                            weights[*seq_id - 1] + weights[*seq_id],
                         );
                     }
 
-                    head_node_id = new_node_id;
-                    prev_weight = weights[*seq_id];
+                    prev_node_id = curr_node_id;
                 }
             }
 
             if let Some(tail_node_id) = begin_end_node_ids.1 {
                 // both nodes contribute to edge weight
                 self.add_edge(
-                    head_node_id.unwrap(), tail_node_id,
-                    prev_weight + weights[*valid_seq_ids.last().unwrap() + 1],
+                    prev_node_id.unwrap(), last_node_id,
+                    weights[*valid_seq_ids.last().unwrap()] + weights[*valid_seq_ids.last().unwrap() + 1],
                 );
+
+                //prev_node_id = Some(last_node_id);
             }
 
-            self.add_edge(START_NODE_ID, begin_end_node_ids.0.unwrap(), weights[0]);
-            self.add_edge(head_node_id.unwrap(), END_NODE_ID, *weights.last().unwrap());
+            //self.add_edge(prev_node_id.unwrap(), END_NODE_ID, *weights.last().unwrap());
         }
 
-        self.sequences_begin_nodes_ids.push(begin_end_node_ids.0.unwrap());
+        //self.add_edge(START_NODE_ID, begin_node_id.unwrap(), 1 + weights[0]);
 
-        self.topological_sort();
+        self.sequences_begin_nodes_ids.push(begin_node_id.unwrap());
+
+        self._topological_sort_spoa();
     }
 
-    // Kahn’s algorithm
-    fn topological_sort_DFS(&mut self) {
-        // todo try to re-use memory and eventually shrink it later, or push new elements
-        self.rank_to_node_id.clear();
-        self.rank_to_node_id = Vec::with_capacity(self.nodes.len());
+    // Kahn’s algorithm: it needs the list of "start nodes" which have no incoming edges
+    fn _topological_sort_kahn(&mut self) {
+        self.rank_to_node_id.resize(self.nodes.len(), 0);
+
+        let mut rank = 0;
 
         // O(V)
         let mut in_degree = vec![0; self.nodes.len()];
@@ -334,12 +335,19 @@ impl POGraph {
         let mut num_visited_vertices: usize = 0;
 
         //let mut node_ids_queue = vec![START_NODE_ID; 1];
-        let mut node_ids_queue = vec![0; 1];
+        let mut node_ids_queue: Vec<usize> = self.sequences_begin_nodes_ids.
+            iter().
+            cloned().
+            filter(|node_id| self.nodes[*node_id].in_edges.is_empty()).
+            collect();
+        node_ids_queue.sort();
+        node_ids_queue.dedup();
 
         while !node_ids_queue.is_empty() {
             let node_id = node_ids_queue.pop().unwrap();
 
-            self.rank_to_node_id.push(node_id);
+            self.rank_to_node_id[rank] = node_id;
+            rank += 1;
 
             for edge_ in &self.nodes[node_id].out_edges {
                 let end_node_id = edge_.borrow().end_node_id;
@@ -354,14 +362,13 @@ impl POGraph {
         }
 
         // Check if there was a cycle
-        debug_assert_eq!(num_visited_vertices, self.nodes.len(), "[wfpoa::POGraph::topological_sort] error: Graph is not a DAG");
-        //debug_assert!(self.is_topologically_sorted());
+        debug_assert_eq!(num_visited_vertices, self.nodes.len(), "[wfpoa::POGraph::topological_sort] error: graph is not a DAG");
     }
 
+    // It needs a single "start node" which have no incoming edges
     fn _topological_sort_abpoa(&mut self) {
-        // todo try to re-use memory and eventually shrink it later, or push new elements
-        self.rank_to_node_id = vec![0; self.nodes.len()];
-        //self.node_id_to_rank = vec![0; self.nodes.len()];
+        self.rank_to_node_id.resize(self.nodes.len(), 0);
+        //self.node_id_to_rank.resize(self.nodes.len(), 0);
 
         let mut rank = 0;
 
@@ -371,7 +378,7 @@ impl POGraph {
             in_degree[node.id] = node.in_edges.len();
         }
 
-        let mut node_ids_queue = vec![0; 1];
+        let mut node_ids_queue = vec![START_NODE_ID; 1];
 
         // Breadth-First-Search
         while !node_ids_queue.is_empty() {
@@ -402,66 +409,74 @@ impl POGraph {
         }
     }
 
-    fn topological_sort(&mut self) {
-        // todo try to re-use memory and eventually shrink it later, or push new elements
-        self.rank_to_node_id = Vec::with_capacity(self.nodes.len());
+    fn _topological_sort_spoa(&mut self) {
+        self.rank_to_node_id.resize(self.nodes.len(), 0);
 
-        // 0 - unmarked, 1 - temporarily marked, 2 - permanently marked
+        let mut rank = 0;
+
+        // 0) unmarked, 1) temporarily marked, 2) permanently marked
         let mut node_marks: Vec<u8> = vec![0; self.nodes.len()];
-        let mut do_not_check_aligned_nodes: Vec<bool> = vec![false; self.nodes.len()];
-        let mut nodes_to_visit: Vec<usize> = Vec::new();
+        let mut check_aligned_nodes: Vec<bool> = vec![true; self.nodes.len()];
 
-        for i in 0..self.nodes.len() {
-            if node_marks[i] != 0 {
+        let mut node_ids_to_visit: Vec<usize> = Vec::new();
+
+        for node in &self.nodes {
+            if node_marks[node.id] != 0 {
                 continue;
             }
 
-            nodes_to_visit.push(i);
-            while !nodes_to_visit.is_empty() {
-                let node_id = nodes_to_visit.last().unwrap().clone();
+            node_ids_to_visit.push(node.id);
+            while !node_ids_to_visit.is_empty() {
+                let node_id = *node_ids_to_visit.last().unwrap();
 
-                let mut valid = true;
+                let mut is_valid = true;
 
                 if node_marks[node_id] != 2 {
                     for edge_ in &self.nodes[node_id].in_edges {
                         let edge = edge_.borrow();
 
                         if node_marks[edge.begin_node_id] != 2 {
-                            nodes_to_visit.push(edge.begin_node_id);
-                            valid = false;
+                            node_ids_to_visit.push(edge.begin_node_id);
+                            is_valid = false;
                         }
                     }
 
-                    if !do_not_check_aligned_nodes[node_id] {
+                    if check_aligned_nodes[node_id] {
                         for aligned_node_id in &self.nodes[node_id].aligned_nodes_ids {
                             if node_marks[*aligned_node_id] != 2 {
-                                nodes_to_visit.push(*aligned_node_id);
-                                do_not_check_aligned_nodes[*aligned_node_id] = true;
-                                valid = false;
+                                node_ids_to_visit.push(*aligned_node_id);
+                                check_aligned_nodes[*aligned_node_id] = false;
+                                is_valid = false;
                             }
                         }
                     }
 
-                    debug_assert!(valid || node_marks[node_id] != 1, "Graph is not a DAG!");
+                    debug_assert!(is_valid || node_marks[node_id] != 1, "[wfpoa::POGraph::topological_sort] error: graph is not a DAG");
 
-                    if valid {
+                    if is_valid {
                         node_marks[node_id] = 2;
-                        if !do_not_check_aligned_nodes[node_id] {
-                            self.rank_to_node_id.push(node_id);
-                            self.rank_to_node_id.extend(self.nodes[node_id].aligned_nodes_ids.to_vec());
+
+                        if check_aligned_nodes[node_id] {
+                            self.rank_to_node_id[rank] = node_id;
+                            rank += 1;
+
+                            for aligned_node_id in &self.nodes[node_id].aligned_nodes_ids {
+                                self.rank_to_node_id[rank] = *aligned_node_id;
+                                rank += 1;
+                            }
                         }
                     } else {
                         node_marks[node_id] = 1;
                     }
                 }
 
-                if valid {
-                    nodes_to_visit.pop();
+                if is_valid {
+                    node_ids_to_visit.pop();
                 }
             }
         }
 
-        debug_assert!(self._is_topologically_sorted());
+        debug_assert!(self._is_topologically_sorted(), "[wfpoa::POGraph::topological_sort] error: graph is not topologically sorted");
     }
 
     fn _is_topologically_sorted(&self) -> bool {
@@ -469,9 +484,7 @@ impl POGraph {
 
         let mut visited_nodes = vec![false; self.nodes.len()];
 
-        for i in 0..self.nodes.len() {
-            let node_id = &self.rank_to_node_id[i];
-
+        for node_id in &self.rank_to_node_id {
             for edge_ in &self.nodes[*node_id].in_edges {
                 if !visited_nodes[edge_.borrow().begin_node_id] {
                     return false;
@@ -485,7 +498,7 @@ impl POGraph {
     }
 
     // It assumes consecutive ranks for the aligned nodes
-    fn initialize_multiple_sequence_alignment(&self) -> (usize, Vec<usize>) {
+    fn _initialize_multiple_sequence_alignment_spoa(&self) -> (usize, Vec<usize>) {
         let num_nodes_minus_1 = self.nodes.len() - 1;
 
         let mut node_id_to_msa_column = vec![0; self.nodes.len()];
@@ -513,11 +526,60 @@ impl POGraph {
         return (column + 1, node_id_to_msa_column);
     }
 
+    // It needs a single "start node" which have no incoming edges
+    fn _initialize_multiple_sequence_alignment_abpoa(&self) -> (usize, Vec<usize>) {
+        // O(V)
+        let mut in_degree = vec![0; self.nodes.len()];
+        for node in &self.nodes {
+            in_degree[node.id] = node.in_edges.len();
+        }
+
+        let mut column = 0;
+        let mut node_id_to_msa_column = vec![usize::MAX; self.nodes.len()];
+
+        let mut node_ids_queue = vec![START_NODE_ID; 1];
+
+        // Breadth-First-Search
+        while !node_ids_queue.is_empty() {
+            let node_id = node_ids_queue.pop().unwrap();
+
+            if node_id_to_msa_column[node_id] == usize::MAX {
+                node_id_to_msa_column[node_id] = column;
+
+                for aligned_node_id in &self.nodes[node_id].aligned_nodes_ids {
+                    node_id_to_msa_column[*aligned_node_id] = column;
+                }
+                column += 1;
+            }
+
+            for edge_ in &self.nodes[node_id].out_edges {
+                let end_node_id = edge_.borrow().end_node_id;
+                in_degree[end_node_id] -= 1;
+
+                if in_degree[end_node_id] == 0 {
+                    let mut add_nodes = true;
+                    for aligned_node_id in &self.nodes[end_node_id].aligned_nodes_ids {
+                        if in_degree[*aligned_node_id] != 0 {
+                            add_nodes = false;
+                            break;
+                        }
+                    }
+                    if add_nodes {
+                        node_ids_queue.push(end_node_id);
+                        node_ids_queue.extend(self.nodes[end_node_id].aligned_nodes_ids.iter());
+                    }
+                }
+            }
+        }
+
+        return (column, node_id_to_msa_column);
+    }
+
     pub fn generate_multiple_sequence_alignment(
         &mut self,
         include_consensus: &bool,
     ) -> (usize, Vec<Vec<u8>>) {
-        let (msa_len, node_id_to_msa_column) = self.initialize_multiple_sequence_alignment();
+        let (msa_len, node_id_to_msa_column) = self._initialize_multiple_sequence_alignment_spoa();
 
         let num_sequences = self.sequences_begin_nodes_ids.len() + if *include_consensus { 1 } else { 0 };
 
@@ -554,10 +616,10 @@ impl POGraph {
     fn branch_completion(
         &self,
         scores: &mut Vec<i64>,
-        predecessors: &mut Vec<i32>,
+        predecessors: &mut Vec<usize>,
         rank: &usize,
     ) -> usize {
-        let node_id = self.rank_to_node_id[*rank].clone();
+        let node_id = self.rank_to_node_id[*rank];
 
         for out_edge_ in &self.nodes[node_id].out_edges {
             let out_edge = out_edge_.borrow();
@@ -569,14 +631,13 @@ impl POGraph {
             }
         }
 
-        let mut max_score: i64 = 0;
-        let mut max_score_id: u32 = 0;
+        let mut max_score_id = *rank;
         for i in (rank + 1)..self.nodes.len() {
-            let node_id = self.rank_to_node_id[i].clone();
+            let node_id = self.rank_to_node_id[i];
             let node = &self.nodes[node_id];
 
             scores[node_id] = -1;
-            predecessors[node_id] = -1;
+            predecessors[node_id] = usize::MAX;
 
             for edge_ in &node.in_edges {
                 let edge = edge_.borrow();
@@ -587,31 +648,30 @@ impl POGraph {
 
                 if scores[node_id] < edge.total_weight ||
                     (scores[node_id] == edge.total_weight &&
-                        scores[predecessors[node_id] as usize] <= scores[edge.begin_node_id]
+                        scores[predecessors[node_id]] <= scores[edge.begin_node_id]
                     ) {
                     scores[node_id] = edge.total_weight;
-                    predecessors[node_id] = edge.begin_node_id as i32;
+                    predecessors[node_id] = edge.begin_node_id;
                 }
             }
 
-            if predecessors[node_id] != -1 {
-                scores[node_id] += scores[predecessors[node_id] as usize];
+            if predecessors[node_id] != usize::MAX {
+                scores[node_id] += scores[predecessors[node_id]];
             }
 
-            if max_score < scores[node_id] {
-                max_score = scores[node_id];
-                max_score_id = node_id as u32;
+            if scores[max_score_id] < scores[node_id] {
+                max_score_id = node_id;
             }
         }
 
-        return max_score_id as usize;
+        return max_score_id;
     }
 
     fn traverse_heaviest_bundle(&mut self) {
-        let num_nodes = self.nodes.len();
+        debug_assert!(!self.rank_to_node_id.is_empty());
 
-        let mut predecessors: Vec<i32> = vec![-1; num_nodes];
-        let mut scores: Vec<i64> = vec![-1; num_nodes];
+        let mut predecessors: Vec<usize> = vec![usize::MAX; self.nodes.len()];
+        let mut scores: Vec<i64> = vec![-1; self.nodes.len()];
 
         let mut max_score_id = 0;
         for node_id in &self.rank_to_node_id {
@@ -621,23 +681,23 @@ impl POGraph {
 
                 if scores[*node_id] < edge.total_weight ||
                     (scores[*node_id] == edge.total_weight &&
-                        scores[predecessors[*node_id] as usize] <= scores[edge.begin_node_id]
+                        scores[predecessors[*node_id]] <= scores[edge.begin_node_id]
                     ) {
                     scores[*node_id] = edge.total_weight;
-                    predecessors[*node_id] = edge.begin_node_id as i32;
+                    predecessors[*node_id] = edge.begin_node_id;
                 }
             }
 
-            if predecessors[*node_id] != -1 {
-                scores[*node_id] += scores[predecessors[*node_id] as usize];
+            if predecessors[*node_id] != usize::MAX {
+                scores[*node_id] += scores[predecessors[*node_id]];
             }
 
             if scores[max_score_id] < scores[*node_id] {
-                max_score_id = node_id.clone();
+                max_score_id = *node_id;
             }
         }
 
-        if self.nodes[max_score_id].out_edges.len() != 0 {
+        if !self.nodes[max_score_id].out_edges.is_empty() {
             let mut node_id_to_rank = vec![0; self.nodes.len()];
             for i in 0..self.nodes.len() {
                 node_id_to_rank[self.rank_to_node_id[i]] = i;
@@ -655,12 +715,12 @@ impl POGraph {
             };
         }
 
-        // traceback
+        // Traceback
         self.consensus.clear();
 
-        while predecessors[max_score_id] != -1 {
+        while predecessors[max_score_id] != usize::MAX {
             self.consensus.push(max_score_id);
-            max_score_id = predecessors[max_score_id] as usize;
+            max_score_id = predecessors[max_score_id];
         }
         self.consensus.push(max_score_id);
 
@@ -675,14 +735,16 @@ impl POGraph {
 
         let font_size = 22;
 
-        let mut node_color = FxHashMap::with_capacity_and_hasher(5, Default::default());
+        let mut node_color = FxHashMap::with_capacity_and_hasher(7, Default::default());
         node_color.insert(b'A', "lightskyblue");
         node_color.insert(b'C', "salmon");
         node_color.insert(b'G', "lightgoldenrod");
         node_color.insert(b'T', "limegreen");
         node_color.insert(b'N', "gray");
+        node_color.insert(b'S', "thistle");
+        node_color.insert(b'E', "thistle");
 
-        let mut node_label = FxHashMap::with_capacity_and_hasher(5, Default::default());
+        let mut node_label = FxHashMap::with_capacity_and_hasher(node_color.len(), Default::default());
 
         let node_width = 1.2;
         let rankdir = "LR";

@@ -96,19 +96,27 @@ fn edit_wavefronts_backtrace(
             print!("\t\toffsets[{}]: {}\n", k + 1, wavefront.offsets[(k + 1 + (-lo)) as usize]);
         }*/
 
+        let i_k = k - wavefront.lo;
+
         // Traceback operation
-        if wavefront.lo <= k + 1 && k + 1 <= wavefront.hi && offset == wavefront.offsets[(k + 1 + (-wavefront.lo)) as usize] {
+        if -1 <= i_k && k + 1 <= wavefront.hi && offset == wavefront.offsets[(i_k + 1) as usize] {
+            // if wavefront.lo <= k + 1 && k + 1 <= wavefront.hi
+
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'D';
             wavefronts.edit_cigar_length += 1;
             k += 1;
             distance -= 1;
-        } else if wavefront.lo <= k - 1 && k - 1 <= wavefront.hi && offset == wavefront.offsets[(k - 1 + (-wavefront.lo)) as usize] + 1 {
+        } else if 1 <= i_k && k - 1 <= wavefront.hi && offset == wavefront.offsets[(i_k - 1) as usize] + 1 {
+            // wavefront.lo <= k - 1 && k - 1 <= wavefront.hi
+
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'I';
             wavefronts.edit_cigar_length += 1;
             k -= 1;
             offset -= 1;
             distance -= 1;
-        } else if wavefront.lo <= k && k <= wavefront.hi && offset == wavefront.offsets[(k + (-wavefront.lo)) as usize] + 1 {
+        } else if 0 <= i_k && k <= wavefront.hi && offset == wavefront.offsets[i_k as usize] + 1 {
+            // wavefront.lo <= k && k <= wavefront.hi
+
             wavefronts.edit_cigar[wavefronts.edit_cigar_length] = b'X';
             wavefronts.edit_cigar_length += 1;
             distance -= 1;
@@ -136,6 +144,8 @@ fn edit_wavefronts_extend_wavefront(
     text: &[u8], text_length: usize,
     _distance: usize,
 ) {
+    //print!("\tedit_wavefronts_extend_wavefront\n");
+
     // Parameters
     let k_min = wavefront.lo;
 
@@ -144,8 +154,7 @@ fn edit_wavefronts_extend_wavefront(
         let mut v = ewavefront_v!(i as isize + k_min, *offset as isize) as usize; // offsets[k]-k
         let mut h = ewavefront_h!(i as isize + k_min, *offset as isize) as usize; // offsets[k]
 
-        /*print!("\tedit_wavefronts_extend_wavefront\n");
-        print!("\t\tk: {}\n", i as isize + k_min);*/
+        //print!("\t\tk: {}\n", i as isize + k_min);
         while v < pattern_length && h < text_length && pattern[v] == text[h] {
             //print!("{}\t{}\t{}\t{}\t{}\tM\t{}\t{}\n", v, h, *offset, _distance, i as isize + k_min, pattern[v] as char, text[h] as char);
             /*print!("\t\t\twavefronts[{}]->offsets[{}]: {}\n", _distance, i as isize + k_min, offset);
@@ -369,6 +378,9 @@ fn main() {
     for _ in 0..reps {
         edit_wavefronts_clean(&mut wavefronts);
         edit_wavefronts_align(&mut wavefronts, pattern, pattern_length, text, text_length);
+        //wavefronts.edit_cigar.truncate(wavefronts.edit_cigar_length);
+        //wavefronts.edit_cigar.reverse();
+        //debug_assert!(&wavefronts.edit_cigar == &"MMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMM".as_bytes());
     }
 
     // Two ways to display the CIGAR string
@@ -380,5 +392,5 @@ fn main() {
     //wavefronts.edit_cigar.truncate(wavefronts.edit_cigar_length);
     //wavefronts.edit_cigar.reverse();
     //debug_assert!(&wavefronts.edit_cigar == &"MMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMM".as_bytes());
-    //println!("{}", String::from_utf8(wavefronts.edit_cigar).unwrap());
+    //println!("{}", String::from_utf8(&wavefronts.edit_cigar).unwrap());
 }

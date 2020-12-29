@@ -161,7 +161,7 @@ void po_graph_add_alignment(
 
     /* todo or remove
      if (sequence_size != weights.size()) {
-        throw std::invalid_argument("[spoa::Graph::add_alignment] error: "
+        throw std::invalid_argument("[wfpoa::POGraph::add_alignment] error: "
                                     "sequence and weights are of unequal size!");
     }*/
 #endif
@@ -177,15 +177,16 @@ void po_graph_add_alignment(
 
         for (i = 0; i < alignment->num_pairs; ++i) {
             if (alignment->aligned_pairs[i].second != -1) {
+#ifdef CAUTIOUS_MODE
+                if (alignment->aligned_pairs[i].second >= sequence_size){
+                    assert("[wfpoa::POGraph::add_alignment] error: invalid alignment!");
+                }
+#endif
                 valid_seq_ids[num_valid_seq_ids++] = alignment->aligned_pairs[i].second;
             }
         }
 
-#ifdef CAUTIOUS_MODE
-        assert(valid_seq_ids[0] <= sequence_size);
-        assert(valid_seq_ids[num_valid_seq_ids - 1] + 1 <= sequence_size);
-#endif
-
+        // Add unaligned bases
         uint32_t tmp = graph->num_nodes;
         begin_node_id = po_graph_add_sequence(graph, sequence, weights, 0, valid_seq_ids[0]);
         int32_t head_node_id = (tmp == graph->num_nodes ? -1 : graph->num_nodes - 1);
@@ -200,6 +201,7 @@ void po_graph_add_alignment(
         uint32_t aligned_node_id;
         po_node *tmp_node;
 
+        // Add aligned bases
         for (i = 0; i < alignment->num_pairs; ++i) {
             pair *pair = alignment->aligned_pairs + i;
 
@@ -597,7 +599,7 @@ void po_graph_traverse_heaviest_bundle(
         } while ((graph->nodes + max_score_id)->num_out_edges != 0);
     }
 
-    // traceback
+    // Traceback
     free(graph->consensus);
     graph->consensus = malloc(
             graph->num_nodes * sizeof(uint32_t)); //todo: manage in a clever way; graph->consensus.clear()
