@@ -378,9 +378,6 @@ fn main() {
     for _ in 0..reps {
         edit_wavefronts_clean(&mut wavefronts);
         edit_wavefronts_align(&mut wavefronts, pattern, pattern_length, text, text_length);
-        //wavefronts.edit_cigar.truncate(wavefronts.edit_cigar_length);
-        //wavefronts.edit_cigar.reverse();
-        //debug_assert!(&wavefronts.edit_cigar == &"MMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMM".as_bytes());
     }
 
     // Two ways to display the CIGAR string
@@ -392,5 +389,5 @@ fn main() {
     //wavefronts.edit_cigar.truncate(wavefronts.edit_cigar_length);
     //wavefronts.edit_cigar.reverse();
     //debug_assert!(&wavefronts.edit_cigar == &"MMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMMMMMXMMMMDMMMMMMMIMMMMMMMMMXMMMMMM".as_bytes());
-    //println!("{}", String::from_utf8(&wavefronts.edit_cigar).unwrap());
+    //println!("{}", String::from_utf8(wavefronts.edit_cigar).unwrap());
 }
