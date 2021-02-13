@@ -49,7 +49,7 @@ impl PONode {
             }
         }
 
-        return None;
+        None
     }
 }
 
@@ -67,7 +67,8 @@ pub struct POGraph {
 
 impl std::fmt::Display for POGraph {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut graph_to_string = format!("num_sequences: {}\n", self.sequences_begin_nodes_ids.len());
+        let mut graph_to_string =
+            format!("num_sequences: {}\n", self.sequences_begin_nodes_ids.len());
         graph_to_string.push_str(&format!("num_nodes: {}\n", self.nodes.len()));
 
         let mut node_id_to_rank = vec![0; self.nodes.len()];
@@ -83,15 +84,14 @@ impl std::fmt::Display for POGraph {
             for edge_ in &node.in_edges {
                 let edge = edge_.borrow();
 
-                graph_to_string.push_str(
-                    &format!(
-                        "\t\t{} ({}) <--- {} ({}) - W: {}\n",
-                        node_id_to_rank[edge.end_node_id],
-                        self.nodes[edge.end_node_id].character as char,
-                        node_id_to_rank[edge.begin_node_id], self.nodes[edge.begin_node_id].character as char,
-                        edge.total_weight
-                    )
-                );
+                graph_to_string.push_str(&format!(
+                    "\t\t{} ({}) <--- {} ({}) - W: {}\n",
+                    node_id_to_rank[edge.end_node_id],
+                    self.nodes[edge.end_node_id].character as char,
+                    node_id_to_rank[edge.begin_node_id],
+                    self.nodes[edge.begin_node_id].character as char,
+                    edge.total_weight
+                ));
                 for label in &edge.sequence_labels {
                     graph_to_string.push_str(&format!("\t\t\tsequence_label: {}\n", label));
                 }
@@ -100,24 +100,25 @@ impl std::fmt::Display for POGraph {
             for edge_ in &node.out_edges {
                 let edge = edge_.borrow();
 
-                graph_to_string.push_str(
-                    &format!(
-                        "\t\t{} ({}) ---> {} ({}) - W: {}\n",
-                        node_id_to_rank[edge.begin_node_id],
-                        self.nodes[edge.begin_node_id].character as char,
-                        node_id_to_rank[edge.end_node_id],
-                        self.nodes[edge.end_node_id].character as char,
-                        edge.total_weight
-                    )
-                );
+                graph_to_string.push_str(&format!(
+                    "\t\t{} ({}) ---> {} ({}) - W: {}\n",
+                    node_id_to_rank[edge.begin_node_id],
+                    self.nodes[edge.begin_node_id].character as char,
+                    node_id_to_rank[edge.end_node_id],
+                    self.nodes[edge.end_node_id].character as char,
+                    edge.total_weight
+                ));
                 for label in &edge.sequence_labels {
                     graph_to_string.push_str(&format!("\t\t\tsequence_label: {}\n", label));
                 }
             }
         }
-        graph_to_string.push_str(&format!("Rank\tNodeId\n"));
+        graph_to_string.push_str("Rank\tNodeId\n");
         for i_node in self.rank_to_node_id.iter().enumerate() {
-            graph_to_string.push_str(&format!("\t{}\t{} ({})\n", i_node.0, i_node.1, self.nodes[*i_node.1].character as char));
+            graph_to_string.push_str(&format!(
+                "\t{}\t{} ({})\n",
+                i_node.0, i_node.1, self.nodes[*i_node.1].character as char
+            ));
         }
 
         write!(f, "{}", graph_to_string)
@@ -126,24 +127,23 @@ impl std::fmt::Display for POGraph {
 
 impl POGraph {
     pub fn new(num_initial_sequences: usize, num_initial_nodes: usize) -> POGraph {
-        let graph = POGraph {
-            nodes: Vec::with_capacity(num_initial_nodes/* + 2*/),
-            rank_to_node_id: Vec::with_capacity(num_initial_nodes/* + 2*/),
-            sequences_begin_nodes_ids: Vec::with_capacity(num_initial_sequences),
-            consensus: Vec::with_capacity(num_initial_nodes),
-        };
-
         //graph.add_node(b'S');
         //graph.add_node(b'E');
 
-        return graph;
+        POGraph {
+            nodes: Vec::with_capacity(num_initial_nodes /* + 2*/),
+            rank_to_node_id: Vec::with_capacity(num_initial_nodes /* + 2*/),
+            sequences_begin_nodes_ids: Vec::with_capacity(num_initial_sequences),
+            consensus: Vec::with_capacity(num_initial_nodes),
+        }
     }
 
     pub fn graph_sequence(&self) -> Vec<u8> {
-        return self.rank_to_node_id.
-            iter().
-            map(|node_id| self.nodes[*node_id].character).
-            collect();
+        return self
+            .rank_to_node_id
+            .iter()
+            .map(|node_id| self.nodes[*node_id].character)
+            .collect();
     }
 
     pub fn add_node(&mut self, character: u8) -> usize {
@@ -157,15 +157,10 @@ impl POGraph {
             aligned_nodes_ids: Vec::new(),
         });
 
-        return last_id;
+        last_id
     }
 
-    pub fn add_edge(
-        &mut self,
-        begin_node_id: usize,
-        end_node_id: usize,
-        weight: u32,
-    ) {
+    pub fn add_edge(&mut self, begin_node_id: usize, end_node_id: usize, weight: u32) {
         for edge_ in self.nodes[begin_node_id].out_edges.iter_mut() {
             let mut edge = edge_.borrow_mut();
 
@@ -209,25 +204,25 @@ impl POGraph {
             prev_node_id = curr_node_id;
         }
 
-        return (Some(first_node_id), Some(curr_node_id));
+        (Some(first_node_id), Some(curr_node_id))
     }
 
-    pub fn add_alignment(
-        &mut self,
-        alignment: &Alignment,
-        sequence: &[u8],
-        weights: &[u32],
-    ) {
+    pub fn add_alignment(&mut self, alignment: &Alignment, sequence: &[u8], weights: &[u32]) {
         //#ifdef CAUTIOUS_MODE
-        if sequence.len() == 0 {
+        if sequence.is_empty() {
             return;
         }
         //#endif
 
-        debug_assert_eq!(sequence.len(), weights.len(), "[wfpoa::POGraph::add_alignment] error: sequence and weights are of unequal size");
+        debug_assert_eq!(
+            sequence.len(),
+            weights.len(),
+            "[wfpoa::POGraph::add_alignment] error: sequence and weights are of unequal size"
+        );
 
         let mut begin_node_id;
-        if alignment.is_empty() { //  no alignment
+        if alignment.is_empty() {
+            //  no alignment
             let begin_end_node_ids = self.add_sequence(sequence, weights, 0, sequence.len());
             begin_node_id = begin_end_node_ids.0;
 
@@ -236,23 +231,33 @@ impl POGraph {
             let mut valid_seq_ids: Vec<usize> = Vec::with_capacity(alignment.len());
             for align in alignment.iter() {
                 if let Some(seq_id) = align.1 {
-                    debug_assert!(seq_id < sequence.len(), "[wfpoa::POGraph::add_alignment] error: invalid alignment");
+                    debug_assert!(
+                        seq_id < sequence.len(),
+                        "[wfpoa::POGraph::add_alignment] error: invalid alignment"
+                    );
 
                     valid_seq_ids.push(seq_id);
                 }
             }
 
-            debug_assert!(!valid_seq_ids.is_empty(), "[wfpoa::POGraph::add_alignment] error: missing sequence in the alignment");
+            debug_assert!(
+                !valid_seq_ids.is_empty(),
+                "[wfpoa::POGraph::add_alignment] error: missing sequence in the alignment"
+            );
 
             // Add unaligned bases
             let begin_end_node_ids = self.add_sequence(sequence, weights, 0, valid_seq_ids[0]);
             begin_node_id = begin_end_node_ids.0;
             let mut prev_node_id = begin_end_node_ids.1;
 
-            let last_node_id = self.add_sequence(
-                sequence, weights,
-                *valid_seq_ids.last().unwrap() + 1, sequence.len(),
-            ).0;
+            let last_node_id = self
+                .add_sequence(
+                    sequence,
+                    weights,
+                    *valid_seq_ids.last().unwrap() + 1,
+                    sequence.len(),
+                )
+                .0;
 
             // Add aligned bases
             let mut curr_node_id: Option<usize>;
@@ -276,15 +281,24 @@ impl POGraph {
                                 curr_node_id = Some(self.add_node(letter));
 
                                 // todo: I don't like to copy everything to avoid borrowing problems in the for
-                                let aligned_nodes_ids = self.nodes[*node_id].aligned_nodes_ids.to_vec();
+                                let aligned_nodes_ids =
+                                    self.nodes[*node_id].aligned_nodes_ids.to_vec();
 
                                 for aligned_node_id in aligned_nodes_ids.iter() {
-                                    self.nodes[curr_node_id.unwrap()].aligned_nodes_ids.push(*aligned_node_id);
-                                    self.nodes[*aligned_node_id].aligned_nodes_ids.push(curr_node_id.unwrap());
+                                    self.nodes[curr_node_id.unwrap()]
+                                        .aligned_nodes_ids
+                                        .push(*aligned_node_id);
+                                    self.nodes[*aligned_node_id]
+                                        .aligned_nodes_ids
+                                        .push(curr_node_id.unwrap());
                                 }
 
-                                self.nodes[curr_node_id.unwrap()].aligned_nodes_ids.push(*node_id);
-                                self.nodes[*node_id].aligned_nodes_ids.push(curr_node_id.unwrap());
+                                self.nodes[curr_node_id.unwrap()]
+                                    .aligned_nodes_ids
+                                    .push(*node_id);
+                                self.nodes[*node_id]
+                                    .aligned_nodes_ids
+                                    .push(curr_node_id.unwrap());
                             }
                         }
                     } else {
@@ -298,7 +312,8 @@ impl POGraph {
                     if let Some(prev_node_id) = prev_node_id {
                         // Both nodes contribute to edge weight
                         self.add_edge(
-                            prev_node_id, curr_node_id.unwrap(),
+                            prev_node_id,
+                            curr_node_id.unwrap(),
                             weights[*seq_id - 1] + weights[*seq_id],
                         );
                     }
@@ -310,8 +325,10 @@ impl POGraph {
             if let Some(last_node_id) = last_node_id {
                 // Both nodes contribute to edge weight
                 self.add_edge(
-                    prev_node_id.unwrap(), last_node_id,
-                    weights[*valid_seq_ids.last().unwrap()] + weights[*valid_seq_ids.last().unwrap() + 1],
+                    prev_node_id.unwrap(),
+                    last_node_id,
+                    weights[*valid_seq_ids.last().unwrap()]
+                        + weights[*valid_seq_ids.last().unwrap() + 1],
                 );
 
                 //prev_node_id = Some(last_node_id);
@@ -343,11 +360,12 @@ impl POGraph {
         let mut num_visited_vertices: usize = 0;
 
         //let mut node_ids_queue = vec![START_NODE_ID; 1];
-        let mut node_ids_queue: Vec<usize> = self.sequences_begin_nodes_ids.
-            iter().
-            cloned().
-            filter(|node_id| self.nodes[*node_id].in_edges.is_empty()).
-            collect();
+        let mut node_ids_queue: Vec<usize> = self
+            .sequences_begin_nodes_ids
+            .iter()
+            .cloned()
+            .filter(|node_id| self.nodes[*node_id].in_edges.is_empty())
+            .collect();
         node_ids_queue.sort();
         node_ids_queue.dedup();
 
@@ -370,7 +388,11 @@ impl POGraph {
         }
 
         // Check if there was a cycle
-        debug_assert_eq!(num_visited_vertices, self.nodes.len(), "[wfpoa::POGraph::topological_sort] error: graph is not a DAG");
+        debug_assert_eq!(
+            num_visited_vertices,
+            self.nodes.len(),
+            "[wfpoa::POGraph::topological_sort] error: graph is not a DAG"
+        );
     }
 
     // It needs a single "start node" which have no incoming edges
@@ -459,7 +481,10 @@ impl POGraph {
                         }
                     }
 
-                    debug_assert!(is_valid || node_marks[node_id] != 1, "[wfpoa::POGraph::topological_sort] error: graph is not a DAG");
+                    debug_assert!(
+                        is_valid || node_marks[node_id] != 1,
+                        "[wfpoa::POGraph::topological_sort] error: graph is not a DAG"
+                    );
 
                     if is_valid {
                         node_marks[node_id] = 2;
@@ -484,7 +509,10 @@ impl POGraph {
             }
         }
 
-        debug_assert!(self._is_topologically_sorted(), "[wfpoa::POGraph::topological_sort] error: graph is not topologically sorted");
+        debug_assert!(
+            self._is_topologically_sorted(),
+            "[wfpoa::POGraph::topological_sort] error: graph is not topologically sorted"
+        );
     }
 
     fn _is_topologically_sorted(&self) -> bool {
@@ -502,7 +530,7 @@ impl POGraph {
             visited_nodes[*node_id] = true;
         }
 
-        return true;
+        true
     }
 
     // It assumes consecutive ranks for the aligned nodes
@@ -531,7 +559,7 @@ impl POGraph {
             column += 1;
         }
 
-        return (column + 1, node_id_to_msa_column);
+        (column + 1, node_id_to_msa_column)
     }
 
     // It needs a single "start node" which have no incoming edges
@@ -580,7 +608,7 @@ impl POGraph {
             }
         }
 
-        return (column, node_id_to_msa_column);
+        (column, node_id_to_msa_column)
     }
 
     pub fn generate_multiple_sequence_alignment(
@@ -589,7 +617,8 @@ impl POGraph {
     ) -> (usize, Vec<Vec<u8>>) {
         let (msa_len, node_id_to_msa_column) = self._initialize_multiple_sequence_alignment_spoa();
 
-        let num_sequences = self.sequences_begin_nodes_ids.len() + if *include_consensus { 1 } else { 0 };
+        let num_sequences =
+            self.sequences_begin_nodes_ids.len() + if *include_consensus { 1 } else { 0 };
 
         let mut msa_seq = vec![vec![b'-'; msa_len]; num_sequences];
 
@@ -604,7 +633,7 @@ impl POGraph {
 
                 node_id = match self.nodes[node_id].successor(&(label as u32)) {
                     Some(new_node_id) => new_node_id,
-                    None => break
+                    None => break,
                 }
             }
         }
@@ -614,11 +643,12 @@ impl POGraph {
             self.traverse_heaviest_bundle();
 
             for node_id in &self.consensus {
-                msa_seq[num_sequences - 1][node_id_to_msa_column[*node_id]] = self.nodes[*node_id].character;
+                msa_seq[num_sequences - 1][node_id_to_msa_column[*node_id]] =
+                    self.nodes[*node_id].character;
             }
         }
 
-        return (msa_len, msa_seq);
+        (msa_len, msa_seq)
     }
 
     fn branch_completion(
@@ -654,10 +684,10 @@ impl POGraph {
                     continue;
                 }
 
-                if scores[node_id] < edge.total_weight ||
-                    (scores[node_id] == edge.total_weight &&
-                        scores[predecessors[node_id]] <= scores[edge.begin_node_id]
-                    ) {
+                if scores[node_id] < edge.total_weight
+                    || (scores[node_id] == edge.total_weight
+                        && scores[predecessors[node_id]] <= scores[edge.begin_node_id])
+                {
                     scores[node_id] = edge.total_weight;
                     predecessors[node_id] = edge.begin_node_id;
                 }
@@ -672,7 +702,7 @@ impl POGraph {
             }
         }
 
-        return max_score_id;
+        max_score_id
     }
 
     fn traverse_heaviest_bundle(&mut self) {
@@ -687,10 +717,10 @@ impl POGraph {
             for edge_ in &node.in_edges {
                 let edge = edge_.borrow();
 
-                if scores[*node_id] < edge.total_weight ||
-                    (scores[*node_id] == edge.total_weight &&
-                        scores[predecessors[*node_id]] <= scores[edge.begin_node_id]
-                    ) {
+                if scores[*node_id] < edge.total_weight
+                    || (scores[*node_id] == edge.total_weight
+                        && scores[predecessors[*node_id]] <= scores[edge.begin_node_id])
+                {
                     scores[*node_id] = edge.total_weight;
                     predecessors[*node_id] = edge.begin_node_id;
                 }
@@ -713,14 +743,15 @@ impl POGraph {
 
             loop {
                 max_score_id = self.branch_completion(
-                    &mut scores, &mut predecessors,
+                    &mut scores,
+                    &mut predecessors,
                     &node_id_to_rank[max_score_id],
                 );
 
-                if self.nodes[max_score_id].out_edges.len() == 0 {
+                if self.nodes[max_score_id].out_edges.is_empty() {
                     break;
                 }
-            };
+            }
         }
 
         // Traceback
@@ -752,10 +783,11 @@ impl POGraph {
         node_color.insert(b'S', "thistle");
         node_color.insert(b'E', "thistle");
 
-        let mut node_label = FxHashMap::with_capacity_and_hasher(node_color.len(), Default::default());
+        let mut node_label =
+            FxHashMap::with_capacity_and_hasher(node_color.len(), Default::default());
 
         let node_width = 1.2;
-        let rankdir = "LR";//TB or LR
+        let rankdir = "LR"; //TB or LR
         let node_style = "filled";
         let node_fixedsize = "true";
         let node_shape = "circle";
@@ -772,10 +804,14 @@ impl POGraph {
         for (rank, node_id) in self.rank_to_node_id.iter().enumerate() {
             let node = &self.nodes[*node_id];
 
-            node_label.insert(node_id, format!("{} ({})\nr: {}", node.character as char, node_id, rank));
+            node_label.insert(
+                node_id,
+                format!("{} ({})\nr: {}", node.character as char, node_id, rank),
+            );
 
             graph_to_dot.push_str(&format!(
-                "\"{}\" [color={}, fontsize={}]\n", node_label[node_id], node_color[&node.character], font_size
+                "\"{}\" [color={}, fontsize={}]\n",
+                node_label[node_id], node_color[&node.character], font_size
             ));
         }
 
@@ -793,56 +829,47 @@ impl POGraph {
 
             for edge_ in &node.out_edges {
                 let edge = edge_.borrow();
-                let out_weight = edge.sequence_labels.len();//abg->node[id].out_weight[j]+1
+                let out_weight = edge.sequence_labels.len(); //abg->node[id].out_weight[j]+1
 
                 graph_to_dot.push_str(&format!(
-                    "\t\"{}\" -> \"{}\" [label=\"{}\", penwidth={}]\n", node_label[node_id], node_label[&edge.end_node_id], out_weight, out_weight + 1
+                    "\t\"{}\" -> \"{}\" [label=\"{}\", penwidth={}]\n",
+                    node_label[node_id],
+                    node_label[&edge.end_node_id],
+                    out_weight,
+                    out_weight + 1
                 ));
             }
 
-            if node.aligned_nodes_ids.len() > 0 {
-                graph_to_dot.push_str(&format!(
-                    "\t{{rank=same; \"{}\" ", node_label[node_id]
-                ));
+            if !node.aligned_nodes_ids.is_empty() {
+                graph_to_dot.push_str(&format!("\t{{rank=same; \"{}\" ", node_label[node_id]));
                 for aligned_node_id in &node.aligned_nodes_ids {
-                    graph_to_dot.push_str(&format!(
-                        "\"{}\" ", node_label[aligned_node_id]
-                    ));
+                    graph_to_dot.push_str(&format!("\"{}\" ", node_label[aligned_node_id]));
                 }
-                graph_to_dot.push_str(&format!(
-                    "}};\n"
-                ));
+                graph_to_dot.push_str("}};\n");
 
-                if show_aligned_mismatch {
-                    if rank > x_index {
-                        x_index = rank;
+                if show_aligned_mismatch && rank > x_index {
+                    x_index = rank;
 
-                        // mismatch dashed line
-                        graph_to_dot.push_str(&format!(
-                            "\t{{ edge [style=dashed, arrowhead=none]; \"{}\" ", node_label[node_id]
-                        ));
+                    // mismatch dashed line
+                    graph_to_dot.push_str(&format!(
+                        "\t{{ edge [style=dashed, arrowhead=none]; \"{}\" ",
+                        node_label[node_id]
+                    ));
 
-                        for aligned_node_id in &node.aligned_nodes_ids {
-                            graph_to_dot.push_str(&format!(
-                                "-> \"{}\" ", node_label[aligned_node_id]
-                            ));
+                    for aligned_node_id in &node.aligned_nodes_ids {
+                        graph_to_dot.push_str(&format!("-> \"{}\" ", node_label[aligned_node_id]));
 
-                            let index = node_id_to_rank[*aligned_node_id];
-                            if index > x_index {
-                                x_index = index;
-                            }
+                        let index = node_id_to_rank[*aligned_node_id];
+                        if index > x_index {
+                            x_index = index;
                         }
-
-                        graph_to_dot.push_str(&format!(
-                            "}}\n"
-                        ));
                     }
+
+                    graph_to_dot.push_str("}}\n");
                 }
             }
         }
-        graph_to_dot.push_str(&format!(
-            "}}\n"
-        ));
+        graph_to_dot.push_str("}}\n");
 
         let file = File::create("WFPOA_graph.dot")?;
         let mut file = LineWriter::new(file);
