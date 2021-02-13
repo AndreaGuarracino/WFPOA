@@ -12,8 +12,8 @@ const START_NODE_ID: usize = 0;
 pub type Alignment = Vec<(Option<usize>, Option<usize>)>;
 
 pub struct POEdge {
-    begin_node_id: usize,
-    end_node_id: usize,
+    pub begin_node_id: usize,
+    pub end_node_id: usize,
 
     sequence_labels: Vec<u32>,
 
@@ -29,10 +29,10 @@ impl POEdge {
 
 pub struct PONode {
     id: usize,
-    character: u8,
+    pub character: u8,
 
-    in_edges: Vec<Rc<RefCell<POEdge>>>,
-    out_edges: Vec<Rc<RefCell<POEdge>>>,
+    pub in_edges: Vec<Rc<RefCell<POEdge>>>,
+    pub out_edges: Vec<Rc<RefCell<POEdge>>>,
 
     aligned_nodes_ids: Vec<usize>,
 }
@@ -54,9 +54,10 @@ impl PONode {
 }
 
 pub struct POGraph {
-    nodes: Vec<PONode>,
+    pub nodes: Vec<PONode>,
 
-    rank_to_node_id: Vec<usize>,
+    pub rank_to_node_id: Vec<usize>,
+    //pub node_id_to_rank: Vec<usize>,
 
     // ToDo: if a START_NODE will be used, replace this vector with the START_NODE's outgoing edges
     sequences_begin_nodes_ids: Vec<usize>,
@@ -136,6 +137,13 @@ impl POGraph {
         //graph.add_node(b'E');
 
         return graph;
+    }
+
+    pub fn graph_sequence(&self) -> Vec<u8> {
+        return self.rank_to_node_id.
+            iter().
+            map(|node_id| self.nodes[*node_id].character).
+            collect();
     }
 
     pub fn add_node(&mut self, character: u8) -> usize {
@@ -299,8 +307,8 @@ impl POGraph {
                 }
             }
 
-            if let Some(tail_node_id) = begin_end_node_ids.1 {
-                // both nodes contribute to edge weight
+            if let Some(last_node_id) = last_node_id {
+                // Both nodes contribute to edge weight
                 self.add_edge(
                     prev_node_id.unwrap(), last_node_id,
                     weights[*valid_seq_ids.last().unwrap()] + weights[*valid_seq_ids.last().unwrap() + 1],
@@ -747,7 +755,7 @@ impl POGraph {
         let mut node_label = FxHashMap::with_capacity_and_hasher(node_color.len(), Default::default());
 
         let node_width = 1.2;
-        let rankdir = "LR";
+        let rankdir = "LR";//TB or LR
         let node_style = "filled";
         let node_fixedsize = "true";
         let node_shape = "circle";
