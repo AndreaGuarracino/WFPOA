@@ -75,5 +75,6 @@ void text_dag_add_connection(
  * Examples
  */
 text_dag_t* text_dag_example1();
-
+text_dag_t* text_dag_example2();
+text_dag_t* text_dag_example3();
 #endif /* TEXT_DAG_H_ */

@@ -139,9 +139,28 @@ text_dag_t* text_dag_example1() {
   return text_dag;
 }
 
-
-
-
+text_dag_t *text_dag_example2() {
+  /*
+   * 0 -> {"XAAAX", NULL, {1,2}},
+   * 1 -> {"XTTTX", {0}, {3}},
+   * 2 -> {"XGGGX", {0}, {3}},
+   * 3 -> {"XAAAX", {1,2}, NULL}
+   */
+  // Allocate
+  text_dag_t *const text_dag = text_dag_new();
+  // Add segments (topologically sorted)
+  text_dag_add_sequence(text_dag, "AAA", 'X');
+  text_dag_add_sequence(text_dag, "TTT", 'X');
+  text_dag_add_sequence(text_dag, "GGG", 'X');
+  text_dag_add_sequence(text_dag, "AAA", 'X');
+  // Add connections (topologically sorted)
+  text_dag_add_connection(text_dag, 0, 1);
+  text_dag_add_connection(text_dag, 0, 2);
+  text_dag_add_connection(text_dag, 1, 3);
+  text_dag_add_connection(text_dag, 2, 3);
+  // Return
+  return text_dag;
+}
 
 text_dag_t *text_dag_example3() {
   /*
