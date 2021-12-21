@@ -91,14 +91,14 @@ void text_dag_add_sequence(
   // Create new segment
   text_dag_segment_t* const segment = text_dag_segment_new();
   // Allocate and copy padded sequence
-  const int sequence_lengh = strlen(sequence);
-  char* const sequence_buffer = malloc(sequence_lengh+3);
+  const int sequence_length = strlen(sequence);
+  char* const sequence_buffer = malloc(sequence_length+3);
   sequence_buffer[0] = sentinel;
-  strncpy(sequence_buffer+1,sequence,sequence_lengh);
-  sequence_buffer[sequence_lengh+1] = sentinel;
-  sequence_buffer[sequence_lengh+2] = '\0';
+  strncpy(sequence_buffer+1,sequence,sequence_length);
+  sequence_buffer[sequence_length+1] = sentinel;
+  sequence_buffer[sequence_length+2] = '\0';
   segment->sequence = sequence_buffer + 1;
-  segment->sequence_length = sequence_lengh;
+  segment->sequence_length = sequence_length;
   // Insert new segment
   text_dag->segments_ts[text_dag->segments_total++] = segment;
 }
@@ -143,3 +143,18 @@ text_dag_t* text_dag_example1() {
 
 
 
+text_dag_t *text_dag_example3() {
+  /*
+   * 0 -> {"XAX", NULL, {1}},
+   * 3 -> {"XGX", {0}, NULL}
+   */
+  // Allocate
+  text_dag_t *const text_dag = text_dag_new();
+  // Add segments (topologically sorted)
+  text_dag_add_sequence(text_dag, "A", 'X');
+  text_dag_add_sequence(text_dag, "G", 'X');
+  // Add connections (topologically sorted)
+  text_dag_add_connection(text_dag, 0, 1);
+  // Return
+  return text_dag;
+}
