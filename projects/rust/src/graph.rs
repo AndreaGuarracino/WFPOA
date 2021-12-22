@@ -845,7 +845,7 @@ impl POGraph {
                 for aligned_node_id in &node.aligned_nodes_ids {
                     graph_to_dot.push_str(&format!("\"{}\" ", node_label[aligned_node_id]));
                 }
-                graph_to_dot.push_str("}};\n");
+                graph_to_dot.push_str("};\n");
 
                 if show_aligned_mismatch && rank > x_index {
                     x_index = rank;
@@ -865,11 +865,11 @@ impl POGraph {
                         }
                     }
 
-                    graph_to_dot.push_str("}}\n");
+                    graph_to_dot.push_str("}\n");
                 }
             }
         }
-        graph_to_dot.push_str("}}\n");
+        graph_to_dot.push_str("}\n");
 
         let file = File::create("WFPOA_graph.dot")?;
         let mut file = LineWriter::new(file);

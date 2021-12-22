@@ -1,7 +1,7 @@
 #include "graph.h"
 #include <stdlib.h>
 
-#include <stdio.h> // for printf
+//#include <stdio.h> // for printf
 #include <stdbool.h>
 #include <assert.h>
 
@@ -53,7 +53,7 @@ void po_graph_init(
     graph->sequences_begin_nodes_ids = malloc(3 * sizeof(uint32_t)); //todo: make it growable
 
     //uint32_t* consensus = malloc(num_initial_nodes * sizeof(uint32_t)); //todo: make it growable
-    uint32_t consensus_len = 0;
+    graph->consensus_len = 0;
 }
 
 void po_graph_create_and_init_node(
@@ -123,7 +123,7 @@ void po_graph_add_edge(
     end_node->in_edges[end_node->num_in_edges++] = edge;
 }
 
-int32_t po_graph_add_sequence(
+int64_t po_graph_add_sequence(
         po_graph *const graph,
         const char *sequence,
         const uint32_t *weights,
@@ -133,7 +133,7 @@ int32_t po_graph_add_sequence(
         return -1;
     }
 
-    int32_t first_node_id = po_graph_add_node(graph, sequence[begin]);
+    uint32_t first_node_id = po_graph_add_node(graph, sequence[begin]);
     uint32_t prev_node_id = first_node_id;
     uint32_t curr_node_id;
     for (uint32_t i = begin + 1; i < end; ++i) {
@@ -165,7 +165,8 @@ void po_graph_add_alignment(
                                     "sequence and weights are of unequal size!");
     }*/
 #endif
-    int32_t begin_node_id;
+
+    int64_t begin_node_id;
     if (alignment->num_pairs == 0) { //  no alignment
         begin_node_id = po_graph_add_sequence(graph, sequence, weights, 0, sequence_size);
     } else {
@@ -178,24 +179,25 @@ void po_graph_add_alignment(
         for (i = 0; i < alignment->num_pairs; ++i) {
             if (alignment->aligned_pairs[i].second != -1) {
 #ifdef CAUTIOUS_MODE
-                if (alignment->aligned_pairs[i].second >= sequence_size){
-                    assert("[wfpoa::POGraph::add_alignment] error: invalid alignment!");
-                }
+                assert(alignment->aligned_pairs[i].second < sequence_size &&
+                       "[wfpoa::POGraph::add_alignment] error: invalid alignment!");
 #endif
                 valid_seq_ids[num_valid_seq_ids++] = alignment->aligned_pairs[i].second;
             }
         }
 
         // Add unaligned bases
-        uint32_t tmp = graph->num_nodes;
         begin_node_id = po_graph_add_sequence(graph, sequence, weights, 0, valid_seq_ids[0]);
-        int32_t head_node_id = (tmp == graph->num_nodes ? -1 : graph->num_nodes - 1);
 
-        int32_t tail_node_id = po_graph_add_sequence(
+        // The explicit cast (int64_t) is necessary to avoid wrong values in head_node_id when it has to be -1
+        int64_t head_node_id = begin_node_id == -1 ? -1 : (int64_t) (graph->num_nodes - 1);
+
+        int64_t tail_node_id = po_graph_add_sequence(
                 graph, sequence, weights,
                 valid_seq_ids[num_valid_seq_ids - 1] + 1, sequence_size);
 
-        int32_t new_node_id = -1;
+        int64_t new_node_id;
+        // todo why is it a float?
         float prev_weight = head_node_id == -1 ? 0 : (float) weights[valid_seq_ids[0] - 1];
 
         uint32_t aligned_node_id;
@@ -216,9 +218,11 @@ void po_graph_add_alignment(
                 tmp_node = graph->nodes + pair->first;
 
                 if (tmp_node->character == letter) {
+                    // No need to create a new node
                     new_node_id = pair->first;
                 } else {
-                    int32_t aligned_to_node_id = -1;
+                    // Search if there are aligned nodes with the same character
+                    int64_t aligned_to_node_id = -1;
                     for (j = 0; j < tmp_node->num_aligned_nodes_ids; ++j) {
                         aligned_node_id = tmp_node->aligned_nodes_ids[j];
 
@@ -229,8 +233,11 @@ void po_graph_add_alignment(
                     }
 
                     if (aligned_to_node_id == -1) {
+                        // In the current graph position there are no aligned nodes with the same character,
+                        // so we need to create a new node
                         new_node_id = po_graph_add_node(graph, letter);
 
+                        // Update the information in all the aligned nodes in the current graph position
                         for (j = 0; j < tmp_node->num_aligned_nodes_ids; ++j) {
                             aligned_node_id = tmp_node->aligned_nodes_ids[j];
 
@@ -251,6 +258,7 @@ void po_graph_add_alignment(
                                 tmp_node->num_aligned_nodes_ids++
                         ] = new_node_id;
                     } else {
+                        // In the current graph position there is already a node with the same character
                         new_node_id = aligned_to_node_id;
                     }
                 }
@@ -398,7 +406,7 @@ uint32_t initialize_multiple_sequence_alignment(
 
     uint32_t node_id;
     uint32_t num_aligned_nodes_ids;
-    uint32_t* aligned_nodes_ids;
+    uint32_t *aligned_nodes_ids;
 
     uint32_t column = 0;
     for (uint32_t i = 0; i < graph->num_nodes; ++i) {
@@ -471,23 +479,19 @@ void generate_multiple_sequence_alignment(
     *msa_seq = _msa_seq;
 }
 
-void reverse(uint32_t *arr, int n) {
-    uint32_t aux[n];
-    uint32_t i;
-
-    for (i = 0; i < n; ++i) {
-        aux[n - 1 - i] = arr[i];
-    }
-
-    for (i = 0; i < n; ++i) {
-        arr[i] = aux[i];
+void reverse(uint32_t *arr, uint32_t n) {
+    for (uint32_t low = 0, high = n - 1; low < high; low++, high--)
+    {
+        uint32_t temp = arr[low];
+        arr[low] = arr[high];
+        arr[high] = temp;
     }
 }
 
 uint32_t po_graph_branch_completion(
         po_graph *const graph,
         int64_t *scores,
-        int32_t *predecessors,
+        int64_t *predecessors,
         uint32_t rank) {
     uint32_t i, j;
 
@@ -551,7 +555,7 @@ void po_graph_traverse_heaviest_bundle(
     po_node *tmp_node;
     po_edge *tmp_edge;
 
-    int32_t *predecessors = malloc(num_nodes * sizeof(int32_t));
+    int64_t *predecessors = malloc(num_nodes * sizeof(int32_t));
     int64_t *scores = malloc(num_nodes * sizeof(int64_t));
     for (i = 0; i < num_nodes; i++) {
         predecessors[i] = -1;

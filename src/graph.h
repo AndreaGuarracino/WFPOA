@@ -91,7 +91,7 @@ void po_graph_add_edge(
         uint32_t begin_node_id, uint32_t end_node_id,
         uint32_t weight);
 
-int32_t po_graph_add_sequence(
+int64_t po_graph_add_sequence(
         po_graph *wf_graph,
         const char *sequence,
         const uint32_t *weights,
@@ -119,7 +119,7 @@ void generate_multiple_sequence_alignment(
 uint32_t po_graph_branch_completion(
         po_graph *graph,
         int64_t *scores,
-        int32_t *predecessors,
+        int64_t *predecessors,
         uint32_t rank);
 
 void po_graph_traverse_heaviest_bundle(

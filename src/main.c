@@ -12,16 +12,19 @@ int main(int argc, char *argv[]) {
 
     alignment alignment_result;
 
-    char *seq1 = "CAAATAAGT";
-    alignment_result.num_pairs = 0;
-
     uint32_t *weights = malloc(20 * sizeof(uint32_t));
-    for (uint i = 0; i < 20; i++) { weights[i] = 1; }
-    po_graph_add_alignment(
-            &graph,
-            &alignment_result,
-            seq1, strlen(seq1),
-            weights);
+    for (uint8_t i = 0; i < 20; i++) { weights[i] = 1; }
+
+    {
+        char *seq1 = "CAAATAAGT";
+        alignment_result.num_pairs = 0;
+
+        po_graph_add_alignment(
+                &graph,
+                &alignment_result,
+                seq1, strlen(seq1),
+                weights);
+    }
 
     {
         char *seq2 = "CCAATAAT";
@@ -63,6 +66,7 @@ int main(int argc, char *argv[]) {
                 seq2, strlen(seq2),
                 weights);
     }
+
     {
         char *seq3 = "CCTATC";
         /*

@@ -2,6 +2,7 @@
 // https://github.com/TheAlgorithms/Rust/blob/master/src/dynamic_programming/edit_distance.rs
 
 use std::cmp::min;
+use crate::POGraph;
 
 /// edit_distance(str_a, str_b) returns the edit distance between the two
 /// strings This edit distance is defined as being 1 point per insertion,
