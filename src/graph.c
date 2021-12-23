@@ -602,10 +602,8 @@ void po_graph_traverse_heaviest_bundle(
 
     // Traceback
     free(graph->consensus);
-    fprintf(stderr,"UFFA\n");
     graph->consensus = malloc(
             graph->num_nodes * sizeof(uint32_t)); //todo: manage in a clever way; graph->consensus.clear()
-            fprintf(stderr,"UFFA\n");
     graph->consensus_len = 0;
 
     while (predecessors[max_score_id] != -1) {

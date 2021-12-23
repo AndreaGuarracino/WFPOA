@@ -4,6 +4,11 @@
 #include <inttypes.h>
 #include <z3.h>
 
+#define CAUTIOUS_MODE
+
+//#define START_NODE_ID   0
+//#define END_NODE_ID     1
+
 typedef struct {
     int32_t first;
     int32_t second;
@@ -123,6 +128,10 @@ uint32_t po_graph_branch_completion(
         uint32_t rank);
 
 void po_graph_traverse_heaviest_bundle(
+        po_graph *graph
+);
+
+void po_graph_to_dot(
         po_graph *graph
 );
 

@@ -156,4 +156,7 @@ int main(int argc, char *argv[]) {
     for (uint32_t i = 0; i < graph.num_sequences + 1; i++) {
         printf("%s\n", msa_seq[i]);
     }
+
+    po_graph_to_dot(&graph);
+    // dot WFPOA_graph.dot -T png | display
 }

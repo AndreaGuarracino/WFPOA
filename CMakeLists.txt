@@ -11,7 +11,7 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g3")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3")
 
 set(CMAKE_C_SOURCE_FILE_EXTENSIONS src/main.c)
-add_executable(wfpoa ${CMAKE_SOURCE_DIR}/src/main.c src/graph.c src/graph.h)
+add_executable(wfpoa ${CMAKE_SOURCE_DIR}/src/main.c src/graph.c src/utils.c)
 
 set(CMAKE_C_SOURCE_FILE_EXTENSIONS src/wfa.edit.alignment.c)
 add_executable(wfa_edit ${CMAKE_SOURCE_DIR}/src/wfa.edit.alignment.c)

@@ -784,7 +784,7 @@ impl POGraph {
         node_color.insert(b'E', "thistle");
 
         let mut node_label =
-            FxHashMap::with_capacity_and_hasher(node_color.len(), Default::default());
+            FxHashMap::with_capacity_and_hasher(self.nodes.len(), Default::default());
 
         let node_width = 1.2;
         let rankdir = "LR"; //TB or LR
@@ -794,8 +794,7 @@ impl POGraph {
 
         let show_aligned_mismatch = true;
 
-        let mut graph_to_dot = format!("// wfpoa dot file\n//{} nodes.\n", self.nodes.len());
-        // fprintf(fp, "digraph ABPOA_graph {\n\tgraph [dpi=%f]; size=\"%f,%f\";\n\trankdir=\"%s\";\n\tnode [width=%f, style=%s, fixedsize=%s, shape=%s];\n", dpi_size, graph_width, graph_height, rankdir, node_width, node_style, node_fixedsize, node_shape);
+        let mut graph_to_dot = format!("// WFPOA graph dot file\n//{} nodes.\n", self.nodes.len());
         graph_to_dot.push_str(&format!(
             "digraph WFPOA_graph {{\n\tgraph [rankdir=\"{}\"];\n\tnode [width={}, style={}, fixedsize={}, shape={}];\n", rankdir, node_width, node_style, node_fixedsize, node_shape
         ));
@@ -827,6 +826,7 @@ impl POGraph {
         for (rank, node_id) in self.rank_to_node_id.iter().enumerate() {
             let node = &self.nodes[*node_id];
 
+            // Out edges
             for edge_ in &node.out_edges {
                 let edge = edge_.borrow();
                 let out_weight = edge.sequence_labels.len(); //abg->node[id].out_weight[j]+1
@@ -850,7 +850,7 @@ impl POGraph {
                 if show_aligned_mismatch && rank > x_index {
                     x_index = rank;
 
-                    // mismatch dashed line
+                    // Mismatch dashed line
                     graph_to_dot.push_str(&format!(
                         "\t{{ edge [style=dashed, arrowhead=none]; \"{}\" ",
                         node_label[node_id]
