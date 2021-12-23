@@ -1,11 +1,10 @@
 #include "graph.h"
-#include <stdlib.h>
+#include "utils.h"
 
 //#include <stdio.h> // for printf
+#include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
-
-#define CAUTIOUS_MODE
 
 bool po_node_successor(
         po_node *const node,
@@ -52,7 +51,7 @@ void po_graph_init(
 
     graph->sequences_begin_nodes_ids = malloc(3 * sizeof(uint32_t)); //todo: make it growable
 
-    //uint32_t* consensus = malloc(num_initial_nodes * sizeof(uint32_t)); //todo: make it growable
+    uint32_t* consensus = malloc(num_initial_nodes * sizeof(uint32_t)); //todo: make it growable
     graph->consensus_len = 0;
 }
 
@@ -197,8 +196,7 @@ void po_graph_add_alignment(
                 valid_seq_ids[num_valid_seq_ids - 1] + 1, sequence_size);
 
         int64_t new_node_id;
-        // todo why is it a float?
-        float prev_weight = head_node_id == -1 ? 0 : (float) weights[valid_seq_ids[0] - 1];
+        uint32_t prev_weight = head_node_id == -1 ? 0 : weights[valid_seq_ids[0] - 1];
 
         uint32_t aligned_node_id;
         po_node *tmp_node;
@@ -480,8 +478,7 @@ void generate_multiple_sequence_alignment(
 }
 
 void reverse(uint32_t *arr, uint32_t n) {
-    for (uint32_t low = 0, high = n - 1; low < high; low++, high--)
-    {
+    for (uint32_t low = 0, high = n - 1; low < high; low++, high--) {
         uint32_t temp = arr[low];
         arr[low] = arr[high];
         arr[high] = temp;
@@ -555,7 +552,7 @@ void po_graph_traverse_heaviest_bundle(
     po_node *tmp_node;
     po_edge *tmp_edge;
 
-    int64_t *predecessors = malloc(num_nodes * sizeof(int32_t));
+    int64_t *predecessors = malloc(num_nodes * sizeof(int64_t));
     int64_t *scores = malloc(num_nodes * sizeof(int64_t));
     for (i = 0; i < num_nodes; i++) {
         predecessors[i] = -1;
@@ -605,8 +602,10 @@ void po_graph_traverse_heaviest_bundle(
 
     // Traceback
     free(graph->consensus);
+    fprintf(stderr,"UFFA\n");
     graph->consensus = malloc(
             graph->num_nodes * sizeof(uint32_t)); //todo: manage in a clever way; graph->consensus.clear()
+            fprintf(stderr,"UFFA\n");
     graph->consensus_len = 0;
 
     while (predecessors[max_score_id] != -1) {
@@ -618,3 +617,147 @@ void po_graph_traverse_heaviest_bundle(
     reverse(graph->consensus, graph->consensus_len);
 }
 
+// For nucleotides
+// AaCcGgTtNn ==> 0,1,2,3,4
+unsigned char from_base_to_index_table[256] = {
+        0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4 /*'-'*/, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
+};
+
+void po_graph_to_dot(
+#ifdef CAUTIOUS_MODE
+        po_graph *graph
+#else
+        po_graph *const graph
+#endif
+) {
+    uint32_t i, j, node_id, out_node_id;
+    po_node *node;
+    char base;
+
+    const uint8_t font_size = 22;
+
+#ifdef CAUTIOUS_MODE
+    if (!is_topologically_sorted(graph)) {
+        topological_sort(graph);
+    }
+#endif
+
+    char node_color[7][15] = {"lightskyblue", "salmon", "lightgoldenrod", "limegreen", "gray", "thistle",
+                              "thistle"}; // ACGTN[SE]
+
+    char **node_label = (char **) malloc(graph->num_nodes * sizeof(char *));
+    for (i = 0; i < graph->num_nodes; ++i) node_label[i] = (char *) malloc(sizeof(char) * 128);
+
+    float node_width = (float) 1.2;
+    char rankdir[3] = "LR"; //TB or LR
+    char node_style[7] = "filled";
+    char node_fixedsize[5] = "true";
+    char node_shape[7] = "circle";
+
+    bool show_aligned_mismatch = true;
+
+    char filename_with_ext[16] = "WFPOA_graph.dot";
+
+    FILE *fp = err_xopen_core(__func__, filename_with_ext, "w");
+    fprintf(fp, "// WFPOA graph dot file.\n// %d nodes.\n", graph->num_nodes);
+    fprintf(fp,
+            "digraph WFPOA_graph {\n\tgraph [rankdir=\"%s\"];\n\tnode [width=%f, style=%s, fixedsize=%s, shape=%s];\n",
+            rankdir, node_width, node_style, node_fixedsize, node_shape);
+
+    // Prepare node labels and write node color and fontsize
+    for (i = 0; i < graph->num_nodes; ++i) {
+        node_id = graph->rank_to_node_id[i];
+        node = graph->nodes + node_id;
+
+//        if (node_id == START_NODE_ID) {
+//            base = 'S';
+//            //sprintf(node_label[id], "\"%c\n(%d,%d,%d)\"", base, index, rank, id);
+//            // only show seq
+//            sprintf(node_label[node_id], "\"%c\n%d\"", base, i);
+//            fprintf(fp, "%s [color=%s, fontsize=%d]\n", node_label[node_id], node_color[5], font_size);
+//        } else if (node_id == END_NODE_ID) {
+//            base = 'E';
+//            //sprintf(node_label[node_id], "\"%c\n(%d,%d,%d)\"", base, index, rank, id);
+//            // only show seq
+//            sprintf(node_label[node_id], "\"%c\n%d\"", base, i);
+//            fprintf(fp, "%s [color=%s, fontsize=%d]\n", node_label[node_id], node_color[6], font_size);
+//        } else {
+        base = node->character;
+        //sprintf(node_label[id], "\"%c\n(%d,%d,%d)\"", base, index, rank, id);
+        // only show seq
+        sprintf(node_label[node_id], "\"%c\n%d\"", base, i);
+        fprintf(fp, "%s [color=%s, fontsize=%d]\n", node_label[node_id], node_color[from_base_to_index_table[base]],
+                font_size);
+//        }
+    }
+
+    uint32_t *node_id_to_rank;
+    if (show_aligned_mismatch) {
+        node_id_to_rank = malloc(graph->num_nodes * sizeof(uint32_t));
+        for (i = 0; i < graph->num_nodes; ++i) {
+            node_id_to_rank[graph->rank_to_node_id[i]] = i;
+        }
+    }
+
+    int64_t x_index = -1;
+    for (i = 0; i < graph->num_nodes; ++i) {
+        node_id = graph->rank_to_node_id[i];
+        node = graph->nodes + node_id;
+
+        // Out edges
+        for (j = 0; j < node->num_out_edges; ++j) {
+            out_node_id = node->out_edges[j]->end_node_id;
+            uint32_t out_weight = node->out_edges[j]->num_sequence_labels; //abg->node[id].out_weight[j]+1
+
+            fprintf(fp, "\t%s -> %s [label=\"%d\", penwidth=%d]\n", node_label[node_id], node_label[out_node_id],
+                    out_weight, out_weight + 1);
+        }
+
+        if (node->num_aligned_nodes_ids > 0) {
+            fprintf(fp, "\t{rank=same; %s ", node_label[node_id]);
+            for (j = 0; j < node->num_aligned_nodes_ids; ++j) {
+                fprintf(fp, "%s ", node_label[node->aligned_nodes_ids[j]]);
+            }
+            fprintf(fp, "};\n");
+
+            if (show_aligned_mismatch && i > x_index) {
+                x_index = i;
+
+                // Mismatch dashed line
+                fprintf(fp, "\t{ edge [style=dashed, arrowhead=none]; %s ", node_label[node_id]);
+                for (j = 0; j < node->num_aligned_nodes_ids; ++j) {
+                    fprintf(fp, "-> %s ", node_label[node->aligned_nodes_ids[j]]);
+                    uint32_t index = node_id_to_rank[node->aligned_nodes_ids[j]];
+                    x_index = index > x_index ? index : x_index;
+                }
+                fprintf(fp, "}\n");
+            }
+        }
+    }
+    fprintf(fp, "}\n");
+
+    for (i = 0; i < graph->num_nodes; ++i) {
+        free(node_label[i]);
+    };
+    free(node_label);
+    err_fclose(fp);
+
+//    char cmd[1024];
+//    sprintf(cmd, "dot %s -T%s > %s", filename_with_ext, "png", abpt->out_pog);
+//    if (system(cmd) != 0) err_fatal(__func__, "Fail to plot %s DAG.", "WFPOA");
+}
