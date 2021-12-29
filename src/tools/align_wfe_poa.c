@@ -74,12 +74,3 @@ int main(int argc,char* argv[]) {
   mm_allocator_delete(mm_allocator);
   text_dag_delete(text_dag);
 }
-
-
-
-
-
-
-
-
-

@@ -48,7 +48,8 @@ typedef struct {
   int next_total;
 } text_dag_segment_t;
 typedef struct {
-  text_dag_segment_t** segments_ts; // Topologically Sorted
+  text_dag_segment_t** segments_ts; // Topologically Sorted (todo use rank_to_segment_id)
+  int* rank_to_segment_id;          // From ranks (topological sorted) to segment ids
   int segments_total;               // Total number of segments
 } text_dag_t;
 
@@ -62,7 +63,7 @@ void text_dag_delete(
 /*
  * Accessors
  */
-void text_dag_add_sequence(
+void text_dag_add_segment(
     text_dag_t* const text_dag,
     char* const sequence,
     const char sentinel);
@@ -70,12 +71,13 @@ void text_dag_add_connection(
     text_dag_t* const text_dag,
     const int node_a,
     const int node_b);
-
+void text_dag_topological_sort(
+        text_dag_t* const text_dag);
 /*
  * Examples
  */
 text_dag_t* text_dag_example1();
 text_dag_t* text_dag_example2();
 text_dag_t* text_dag_example3();
-text_dag_t* text_dag_example4();
+
 #endif /* TEXT_DAG_H_ */
