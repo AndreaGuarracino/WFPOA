@@ -177,3 +177,26 @@ text_dag_t *text_dag_example3() {
   // Return
   return text_dag;
 }
+
+text_dag_t *text_dag_example4() {
+    /*
+     * 0 -> {"XATGCX", NULL, {1,2}},
+     * 1 -> {"XGATTACAX", {0}, {3}},
+     * 2 -> {"XATAX", {0}, {3}},
+     * 3 -> {"XGGGTX", {1,2}, NULL}
+     */
+    // Allocate
+    text_dag_t* const text_dag = text_dag_new();
+    // Add segments (topologically sorted)
+    text_dag_add_sequence(text_dag,"ATGC",'X');
+    text_dag_add_sequence(text_dag,"GATTACA",'X');
+    text_dag_add_sequence(text_dag,"ATA",'X');
+    text_dag_add_sequence(text_dag,"GGGT",'X');
+    // Add connections (topologically sorted)
+    text_dag_add_connection(text_dag,0,1);
+    text_dag_add_connection(text_dag,0,2);
+    text_dag_add_connection(text_dag,1,3);
+    text_dag_add_connection(text_dag,2,3);
+    // Return
+    return text_dag;
+}

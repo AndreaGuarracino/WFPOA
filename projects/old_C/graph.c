@@ -73,7 +73,7 @@ void po_graph_create_and_init_node(
     node->num_aligned_nodes_ids = 0;
 }
 
-void po_graph_create_and_int_edge(
+void po_graph_create_and_init_edge(
         po_edge *const edge,
         uint32_t begin_node_id, uint32_t end_node_id,
         uint32_t label,
@@ -117,7 +117,7 @@ void po_graph_add_edge(
     po_node *end_node = graph->nodes + end_node_id;
 
     po_edge *edge = malloc(sizeof(po_edge));
-    po_graph_create_and_int_edge(edge, begin_node_id, end_node_id, graph->num_sequences, weight);
+    po_graph_create_and_init_edge(edge, begin_node_id, end_node_id, graph->num_sequences, weight);
     begin_node->out_edges[begin_node->num_out_edges++] = edge;
     end_node->in_edges[end_node->num_in_edges++] = edge;
 }
