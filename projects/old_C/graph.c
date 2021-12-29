@@ -51,7 +51,7 @@ void po_graph_init(
 
     graph->sequences_begin_nodes_ids = malloc(3 * sizeof(uint32_t)); //todo: make it growable
 
-    uint32_t* consensus = malloc(num_initial_nodes * sizeof(uint32_t)); //todo: make it growable
+    graph->consensus = malloc(num_initial_nodes * sizeof(uint32_t)); //todo: make it growable
     graph->consensus_len = 0;
 }
 

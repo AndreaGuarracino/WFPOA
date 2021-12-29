@@ -44,6 +44,7 @@ typedef struct {
   // Links
   int* prev;
   int prev_total;
+  int* prev_weight;
   int* next;
   int next_total;
 } text_dag_segment_t;
@@ -51,6 +52,8 @@ typedef struct {
   text_dag_segment_t** segments_ts; // Topologically Sorted (todo use rank_to_segment_id)
   int* rank_to_segment_id;          // From ranks (topological sorted) to segment ids
   int segments_total;               // Total number of segments
+  int* consensus;                   // Consensus sequence
+  int consensus_len;                // Consensus sequence length
 } text_dag_t;
 
 /*
@@ -70,8 +73,16 @@ void text_dag_add_segment(
 void text_dag_add_connection(
     text_dag_t* const text_dag,
     const int node_a,
-    const int node_b);
+    const int node_b,
+    const int weight);
 void text_dag_topological_sort(
+        text_dag_t* const text_dag);
+int text_dag_branch_completion(
+        text_dag_t* const text_dag,
+        int64_t *scores,
+        int64_t *predecessors,
+        int segment_rank);
+void text_dag_traverse_heaviest_bundle(
         text_dag_t* const text_dag);
 /*
  * Examples
