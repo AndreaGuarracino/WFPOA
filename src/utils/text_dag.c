@@ -68,7 +68,6 @@ text_dag_t* text_dag_new() {
   // Allocate
   text_dag_t* const text_dag = malloc(sizeof(text_dag_t));
   text_dag->segments_ts = malloc(DAG_MAX_SEGMENTS*sizeof(text_dag_segment_t*));
-  text_dag->rank_to_segment_id = malloc(DAG_MAX_SEGMENTS*sizeof(int));
   text_dag->segments_total = 0;
   text_dag->consensus = malloc(DAG_MAX_SEGMENTS * sizeof(int));
   text_dag->consensus_len = 0;
@@ -84,7 +83,6 @@ void text_dag_delete(
   }
   // Free DAG
   free(text_dag->segments_ts);
-  free(text_dag->rank_to_segment_id);
   free(text_dag);
 }
 /*
@@ -135,22 +133,19 @@ void text_dag_add_connection(
 
 void text_dag_topological_sort(
         text_dag_t* const text_dag){
-    // Clear ranks
-    for(int i = 0; i < text_dag->segments_total; ++i) {
-        text_dag->rank_to_segment_id[i] = 0;
-    }
+    text_dag_segment_t** tmp_segments = malloc(DAG_MAX_SEGMENTS*sizeof(text_dag_segment_t*));
 
-    int* segment_ids_to_visit = malloc(text_dag->segments_total * sizeof(int)); //todo: implement a proper stack
+    int* segment_ids_to_visit = malloc(text_dag->segments_total*sizeof(int)); //todo: implement a proper stack
     int stack_next_index = 0;
 
     // O(V)
     int* in_degree = malloc(text_dag->segments_total*sizeof(int));
-    for(int i = 0; i < text_dag->segments_total; ++i) {
-        in_degree[i] = text_dag->segments_ts[i]->prev_total;
+    for(int segment_id = 0; segment_id < text_dag->segments_total; ++segment_id) {
+        in_degree[segment_id] = text_dag->segments_ts[segment_id]->prev_total;
 
         // Kahn’s algorithm: it needs the list of "start nodes" which have no incoming edges
-        if (in_degree[i] == 0) {
-            segment_ids_to_visit[stack_next_index++] = i;
+        if (in_degree[segment_id] == 0) {
+            segment_ids_to_visit[stack_next_index++] = segment_id;
         }
     }
 
@@ -161,11 +156,12 @@ void text_dag_topological_sort(
 
     while (stack_next_index != 0) {
         int segment_id = segment_ids_to_visit[--stack_next_index]; //top();
+        text_dag_segment_t* segment = text_dag->segments_ts[segment_id];
 
-        text_dag->rank_to_segment_id[segment_rank++] = segment_id;
+        tmp_segments[segment_rank++] = segment;
 
-        for (int j = 0; j < text_dag->segments_ts[segment_id]->next_total; ++j) {
-            int segment_id_next = text_dag->segments_ts[segment_id]->next[j];
+        for (int j = 0; j < segment->next_total; ++j) {
+            int segment_id_next = segment->next[j];
 
             --in_degree[segment_id_next];
 
@@ -182,9 +178,11 @@ void text_dag_topological_sort(
         (num_visited_vertices == text_dag->segments_total) &&
         "[wfpoa::text_dag_topological_sort] error: graph is not a DAG");
 
-//    for (int i = 0; i < text_dag->segments_total; ++i) {
-//        int segment_id = text_dag->rank_to_segment_id[i];
-//        printf("segment_rank %d to segment id %d (%s)\n", i, segment_id, text_dag->segments_ts[segment_id]->sequence - 1);
+    free(text_dag->segments_ts);
+    text_dag->segments_ts = tmp_segments;
+
+//    for (int segment_id = 0; segment_id< text_dag->segments_total; ++segment_id) {
+//        printf("segment_rank/id %d (%s)\n", segment_id, text_dag->segments_ts[segment_id]->sequence - 1);
 //    }
 }
 
@@ -195,7 +193,6 @@ int text_dag_branch_completion(
         int segment_rank) {
     uint32_t i, j;
 
-    int segment_id = text_dag->rank_to_segment_id[segment_rank];
     text_dag_segment_t* segment = text_dag->segments_ts[segment_id];
     //po_edge *tmp_edge;
 
@@ -213,8 +210,7 @@ int text_dag_branch_completion(
 
     int64_t max_score = 0;
     int segment_id_with_max_score = 0;
-    for (i = segment_rank + 1; i < text_dag->segments_total; ++i) {
-        segment_id = text_dag->rank_to_segment_id[i];
+    for (++segment_id; segment_id < text_dag->segments_total; ++segment_id) {
         segment = text_dag->segments_ts[segment_id];
 
         scores[segment_id] = -1;
@@ -261,7 +257,6 @@ void reverse(int* arr, int n) {
 void text_dag_traverse_heaviest_bundle(
         text_dag_t* const text_dag) {
     int i, j;
-    int segment_id;
     text_dag_segment_t* segment;
 
     int64_t *predecessors = malloc(text_dag->segments_total * sizeof(int64_t));
@@ -272,8 +267,7 @@ void text_dag_traverse_heaviest_bundle(
     }
 
     int segment_id_with_max_score = 0;
-    for (i = 0; i < text_dag->segments_total; ++i) {
-        segment_id = text_dag->rank_to_segment_id[i];
+    for (int segment_id = 0; segment_id < text_dag->segments_total; ++segment_id) {
         segment = text_dag->segments_ts[segment_id];
 
         for (j = 0; j < segment->prev_total; ++j) {
@@ -300,16 +294,10 @@ void text_dag_traverse_heaviest_bundle(
     }
 
     if (text_dag->segments_ts[segment_id_with_max_score]->next_total > 0) {
-        int* segment_id_to_rank = malloc(text_dag->segments_total * sizeof(int));
-
-        for (i = 0; i < text_dag->segments_total; ++i) {
-            segment_id_to_rank[text_dag->rank_to_segment_id[i]] = i;
-        }
-
         do {
             segment_id_with_max_score = text_dag_branch_completion(text_dag,
                                                                    scores, predecessors,
-                                                                   segment_id_to_rank[segment_id_with_max_score]);
+                                                                   segment_id_with_max_score);
         } while (text_dag->segments_ts[segment_id_with_max_score]->next_total != 0);
     }
 

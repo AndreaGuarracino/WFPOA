@@ -42,15 +42,14 @@ typedef struct {
   char* sequence;
   int sequence_length;
   // Links
-  int* prev;
+  int* prev;                        // Ingoing edges
   int prev_total;
-  int* prev_weight;
-  int* next;
+  int* prev_weight;                 // Weight of the ingoing edges
+  int* next;                        // Outgoing edges
   int next_total;
 } text_dag_segment_t;
 typedef struct {
-  text_dag_segment_t** segments_ts; // Topologically Sorted (todo use rank_to_segment_id)
-  int* rank_to_segment_id;          // From ranks (topological sorted) to segment ids
+  text_dag_segment_t** segments_ts; // Topologically Sorted
   int segments_total;               // Total number of segments
   int* consensus;                   // Consensus sequence
   int consensus_len;                // Consensus sequence length
