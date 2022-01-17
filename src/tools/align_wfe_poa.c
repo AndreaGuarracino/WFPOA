@@ -65,6 +65,17 @@ int main(int argc,char* argv[]) {
   edit_wavefront_poa_t* const wavefront_poa = edit_wavefront_poa_new(mm_allocator);
   edit_wavefront_poa_align(wavefront_poa,pattern,pattern_length,text_dag,&cigar);
 
+  text_dag_topological_sort(text_dag);
+
+  text_dag_traverse_heaviest_bundle(text_dag);
+  for (int i = 0; i < text_dag->consensus_len; ++i) {
+      int segment_id = text_dag->consensus[i];
+      printf("%s", text_dag->segments_ts[segment_id]->sequence);
+  }
+  printf("\n");
+
+  text_dag_generate_gfa(text_dag, true);
+
   // Display backtrace
   cigar_print(stderr,&cigar);
 

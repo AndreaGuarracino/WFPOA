@@ -34,8 +34,11 @@
 /*
  * Config
  */
-#define DAG_SEGMENT_MAX_NODES 100
-#define DAG_MAX_SEGMENTS 100
+#define DAG_SEGMENT_MAX_NODES   100
+#define DAG_MAX_SEGMENTS        100
+#define DAG_MAX_SEQUENCES       100
+
+#define END_SEGMENT_ID           0
 
 /*
  * Setup Segments
@@ -48,6 +51,8 @@ text_dag_segment_t* text_dag_segment_new() {
   segment->prev_total = 0;
   segment->next = malloc(DAG_SEGMENT_MAX_NODES*sizeof(int));
   segment->next_total = 0;
+  segment->seq_rank = malloc(DAG_MAX_SEQUENCES*sizeof(int));
+  segment->seq_rank_total = 0;
   segment->sequence = NULL;
   segment->sequence_length = 0;
   // Return
@@ -59,6 +64,7 @@ void text_dag_segment_delete(
   free(segment->prev);
   free(segment->next);
   free(segment->prev_weight);
+  free(segment->seq_rank);
   free(segment);
 }
 /*
@@ -67,8 +73,11 @@ void text_dag_segment_delete(
 text_dag_t* text_dag_new() {
   // Allocate
   text_dag_t* const text_dag = malloc(sizeof(text_dag_t));
+  text_dag->num_sequences = 0;
   text_dag->segments_ts = malloc(DAG_MAX_SEGMENTS*sizeof(text_dag_segment_t*));
+  text_dag->rank_to_segment_id = malloc(DAG_MAX_SEGMENTS*sizeof(int));
   text_dag->segments_total = 0;
+  text_dag_add_segment(text_dag,"E",'X');
   text_dag->consensus = malloc(DAG_MAX_SEGMENTS * sizeof(int));
   text_dag->consensus_len = 0;
   // Return
@@ -83,6 +92,8 @@ void text_dag_delete(
   }
   // Free DAG
   free(text_dag->segments_ts);
+  free(text_dag->rank_to_segment_id);
+  free(text_dag->consensus);
   free(text_dag);
 }
 /*
@@ -115,6 +126,9 @@ void text_dag_add_connection(
   text_dag_segment_t* const segment_a = text_dag->segments_ts[segment_id_a];
   text_dag_segment_t* const segment_b = text_dag->segments_ts[segment_id_b];
 
+  // Add sequence
+  segment_a->seq_rank[segment_a->seq_rank_total++] = text_dag->num_sequences;
+
   // Connect segments
   // Check if the connection already exists
   for (int i = 0; i < segment_b->prev_total; ++i) {
@@ -133,9 +147,12 @@ void text_dag_add_connection(
 
 void text_dag_topological_sort(
         text_dag_t* const text_dag){
-    text_dag_segment_t** tmp_segments = malloc(DAG_MAX_SEGMENTS*sizeof(text_dag_segment_t*));
+    // Clear ranks
+    for(int i = 0; i < text_dag->segments_total; ++i) {
+        text_dag->rank_to_segment_id[i] = 0;
+    }
 
-    int* segment_ids_to_visit = malloc(text_dag->segments_total*sizeof(int)); //todo: implement a proper stack
+    int* segment_ids_to_visit = malloc(text_dag->segments_total * sizeof(int)); //todo: implement a proper stack
     int stack_next_index = 0;
 
     // O(V)
@@ -158,7 +175,7 @@ void text_dag_topological_sort(
         int segment_id = segment_ids_to_visit[--stack_next_index]; //top();
         text_dag_segment_t* segment = text_dag->segments_ts[segment_id];
 
-        tmp_segments[segment_rank++] = segment;
+        text_dag->rank_to_segment_id[segment_rank++] = segment_id;
 
         for (int j = 0; j < segment->next_total; ++j) {
             int segment_id_next = segment->next[j];
@@ -173,16 +190,17 @@ void text_dag_topological_sort(
         num_visited_vertices += 1;
     }
 
+    free(segment_ids_to_visit);
+    free(in_degree);
+
     // Check if there was a cycle
     assert(
         (num_visited_vertices == text_dag->segments_total) &&
         "[wfpoa::text_dag_topological_sort] error: graph is not a DAG");
 
-    free(text_dag->segments_ts);
-    text_dag->segments_ts = tmp_segments;
-
-//    for (int segment_id = 0; segment_id< text_dag->segments_total; ++segment_id) {
-//        printf("segment_rank/id %d (%s)\n", segment_id, text_dag->segments_ts[segment_id]->sequence - 1);
+//    for (int i = 0; i < text_dag->segments_total; ++i) {
+//        int segment_id = text_dag->rank_to_segment_id[i];
+//        printf("segment_rank %d to segment id %d (%s)\n", i, segment_id, text_dag->segments_ts[segment_id]->sequence - 1);
 //    }
 }
 
@@ -193,8 +211,8 @@ int text_dag_branch_completion(
         int segment_rank) {
     uint32_t i, j;
 
+    int segment_id = text_dag->rank_to_segment_id[segment_rank];
     text_dag_segment_t* segment = text_dag->segments_ts[segment_id];
-    //po_edge *tmp_edge;
 
     for (i = 0; i < segment->next_total; ++i) {
         int segment_id_next = segment->next[i];
@@ -210,7 +228,8 @@ int text_dag_branch_completion(
 
     int64_t max_score = 0;
     int segment_id_with_max_score = 0;
-    for (++segment_id; segment_id < text_dag->segments_total; ++segment_id) {
+    for (i = segment_rank + 1; i < text_dag->segments_total; ++i) {
+        segment_id = text_dag->rank_to_segment_id[i];
         segment = text_dag->segments_ts[segment_id];
 
         scores[segment_id] = -1;
@@ -222,7 +241,6 @@ int text_dag_branch_completion(
             }
 
             int segment_id_prev = segment->prev[j];
-            //tmp_edge = tmp_node->in_edges[j];
 
             if (scores[segment_id] < segment->prev_weight[j] ||
                 (scores[segment_id] == segment->prev_weight[j] &&
@@ -257,6 +275,7 @@ void reverse(int* arr, int n) {
 void text_dag_traverse_heaviest_bundle(
         text_dag_t* const text_dag) {
     int i, j;
+    int segment_id;
     text_dag_segment_t* segment;
 
     int64_t *predecessors = malloc(text_dag->segments_total * sizeof(int64_t));
@@ -267,18 +286,17 @@ void text_dag_traverse_heaviest_bundle(
     }
 
     int segment_id_with_max_score = 0;
-    for (int segment_id = 0; segment_id < text_dag->segments_total; ++segment_id) {
+    for (i = 0; i < text_dag->segments_total; ++i) {
+        segment_id = text_dag->rank_to_segment_id[i];
         segment = text_dag->segments_ts[segment_id];
 
         for (j = 0; j < segment->prev_total; ++j) {
             int segment_id_prev = segment->prev[j];
-            //tmp_edge = tmp_node->in_edges[j];
 
             if (scores[segment_id] < segment->prev_weight[j] ||
                 (scores[segment_id] == segment->prev_weight[j] &&
                 scores[predecessors[segment_id]] <= scores[segment_id_prev]
             )) {
-
                 scores[segment_id] = segment->prev_weight[j];
                 predecessors[segment_id] = segment_id_prev;
             }
@@ -288,20 +306,31 @@ void text_dag_traverse_heaviest_bundle(
             scores[segment_id] += scores[predecessors[segment_id]];
         }
 
-        if (scores[segment_id_with_max_score] < scores[segment_id]) {
+        if (segment_id_with_max_score == 0 || scores[segment_id_with_max_score] < scores[segment_id]) {
             segment_id_with_max_score = segment_id;
         }
     }
 
     if (text_dag->segments_ts[segment_id_with_max_score]->next_total > 0) {
+        int* segment_id_to_rank = malloc(text_dag->segments_total * sizeof(int));
+
+        for (i = 0; i < text_dag->segments_total; ++i) {
+            segment_id_to_rank[text_dag->rank_to_segment_id[i]] = i;
+        }
+
         do {
             segment_id_with_max_score = text_dag_branch_completion(text_dag,
                                                                    scores, predecessors,
-                                                                   segment_id_with_max_score);
+                                                                   segment_id_to_rank[segment_id_with_max_score]);
         } while (text_dag->segments_ts[segment_id_with_max_score]->next_total != 0);
+
+        free(segment_id_to_rank);
     }
 
     // Traceback
+    // Skip END_SEGMENT_ID (unique node with next_total == 0)
+    segment_id_with_max_score = predecessors[segment_id_with_max_score];
+
     text_dag->consensus_len = 0;
 
     while (predecessors[segment_id_with_max_score] != -1) {
@@ -311,6 +340,124 @@ void text_dag_traverse_heaviest_bundle(
     text_dag->consensus[text_dag->consensus_len++] = segment_id_with_max_score;
 
     reverse(text_dag->consensus, text_dag->consensus_len);
+
+    free(scores);
+    free(predecessors);
+}
+
+void text_dag_generate_gfa(
+        text_dag_t* const text_dag,
+        const bool add_consensus) {
+    int i, j;
+
+    int* segment_ids_to_visit = malloc(text_dag->segments_total*sizeof(int)); //todo: implement a proper stack
+    int stack_next_index = 0;
+
+    // O(V)
+    int* in_degree = malloc(text_dag->segments_total*sizeof(int));
+    for(int segment_id = 0; segment_id < text_dag->segments_total; ++segment_id) {
+        in_degree[segment_id] = text_dag->segments_ts[segment_id]->prev_total;
+
+        if (in_degree[segment_id] == 0) {
+            segment_ids_to_visit[stack_next_index++] = segment_id;
+        }
+    }
+
+    int* read_path_i = (int*)calloc(text_dag->num_sequences, sizeof(int));
+    int** read_paths = (int**)malloc(text_dag->num_sequences * sizeof(int*));
+    for (i = 0; i < text_dag->num_sequences; ++i) {
+        read_paths[i] = (int*)malloc(text_dag->segments_total * sizeof(int));
+    }
+
+    // Output header
+    int num_links = 0;
+    for (i = 1; i < text_dag->segments_total; ++i) {
+        num_links += text_dag->segments_ts[i]->prev_total;
+    }
+    printf("H\tVN:Z:1.0\tNS:i:%d\tNL:i:%d\tNP:i:%d\n", text_dag->segments_total, num_links, text_dag->num_sequences + add_consensus);
+
+    while (stack_next_index != 0) {
+        int segment_id = segment_ids_to_visit[--stack_next_index]; //top();
+        if (segment_id == END_SEGMENT_ID) {
+            break;
+        }
+
+        //if (segment_id != START_SEGMENT_ID)
+        text_dag_segment_t* segment = text_dag->segments_ts[segment_id];
+
+        // Output node
+        {
+            const int sequence_length = strlen(segment->sequence) - 1;
+            char* const sequence_buffer = malloc(sequence_length + 1);
+            strncpy(sequence_buffer,segment->sequence,sequence_length);
+            sequence_buffer[sequence_length] = '\0';
+            printf("S\t%d\t%s\n", segment_id, sequence_buffer);
+            free(sequence_buffer);
+        }
+
+        // Output links
+        for (i = 0; i < segment->prev_total; ++i) {
+            int segment_id_prev = segment->prev[i];
+            //if (segment_id_prev != START_SEGMENT_ID)
+            printf("L\t%d\t+\t%d\t+\t0M\n", segment_id_prev, segment_id);
+        }
+
+        // Add segment_id to read paths
+        int seq_rank;
+        for (i = 0; i < segment->seq_rank_total; ++i) {
+            seq_rank = segment->seq_rank[i];
+            read_paths[seq_rank][read_path_i[seq_rank]++] = segment_id;
+        }
+
+        for (i = 0; i < segment->next_total; ++i) {
+            int segment_id_next = segment->next[i];
+
+            --in_degree[segment_id_next];
+
+            if (in_degree[segment_id_next] == 0) {
+                segment_ids_to_visit[stack_next_index++] = segment_id_next;
+            }
+        }
+    }
+
+    // Output paths
+    for (i = 0; i < text_dag->num_sequences; ++i) {
+        // todo add sequence header
+        printf("P\t%d\t", i);
+
+        // todo manage reverse (is_rc[i])
+        if (false) {
+            for (j = read_path_i[i]-1; j >= 0; --j) {
+                printf( "%d-", read_paths[i][j]);
+                if (j != 0) printf( ",");
+                else printf( "\t*\n");
+            }
+        } else {
+            for (j = 0; j < read_path_i[i]; ++j) {
+                printf( "%d+", read_paths[i][j]);
+                if (j != read_path_i[i]-1) printf(",");
+                else printf("\t*\n");
+            }
+        }
+    }
+
+    if (add_consensus) {
+        printf("P\tConsensus_sequence\t");
+        for (int i = 0; i < text_dag->consensus_len; ++i) {
+            int segment_id = text_dag->consensus[i];
+            printf("%d+", segment_id);
+            if (i != text_dag->consensus_len-1) printf(",");
+        }
+        printf("\t*\n");
+    }
+
+    free(segment_ids_to_visit);
+    free(in_degree);
+    free(read_path_i);
+    for (i = 0; i < text_dag->num_sequences; ++i) {
+        free(read_paths[i]);
+    }
+    free(read_paths);
 }
 
 /*
@@ -331,10 +478,14 @@ text_dag_t* text_dag_example1() {
   text_dag_add_segment(text_dag,"GT",'X');
   text_dag_add_segment(text_dag,"ACT",'X');
   // Add connections (topologically sorted)
-  text_dag_add_connection(text_dag,0,1, 1+1);
-  text_dag_add_connection(text_dag,0,2, 1+1);
+  text_dag_add_connection(text_dag,1,2, 1+1);
+  text_dag_add_connection(text_dag,2,4, 1+1);
+  text_dag_add_connection(text_dag,4, END_SEGMENT_ID, 1+1);
+  ++text_dag->num_sequences;
   text_dag_add_connection(text_dag,1,3, 1+1);
-  text_dag_add_connection(text_dag,2,3, 1+1);
+  text_dag_add_connection(text_dag,3,4, 1+1);
+  text_dag_add_connection(text_dag,4, END_SEGMENT_ID, 1+1);
+  ++text_dag->num_sequences;
   // Return
   return text_dag;
 }
@@ -354,10 +505,14 @@ text_dag_t *text_dag_example2() {
   text_dag_add_segment(text_dag, "GGG", 'X');
   text_dag_add_segment(text_dag, "AAA", 'X');
   // Add connections (topologically sorted)
-  text_dag_add_connection(text_dag, 0, 1, 1+1);
-  text_dag_add_connection(text_dag, 0, 2, 1+1);
+  text_dag_add_connection(text_dag, 1, 2, 1+1);
+  text_dag_add_connection(text_dag, 2, 4, 1+1);
+  text_dag_add_connection(text_dag,4, END_SEGMENT_ID, 1+1);
+  ++text_dag->num_sequences;
   text_dag_add_connection(text_dag, 1, 3, 1+1);
-  text_dag_add_connection(text_dag, 2, 3, 1+1);
+  text_dag_add_connection(text_dag, 3, 4, 1+1);
+  text_dag_add_connection(text_dag,4, END_SEGMENT_ID, 1+1);
+  ++text_dag->num_sequences;
   // Return
   return text_dag;
 }
@@ -373,7 +528,9 @@ text_dag_t *text_dag_example3() {
   text_dag_add_segment(text_dag, "A", 'X');
   text_dag_add_segment(text_dag, "G", 'X');
   // Add connections (topologically sorted)
-  text_dag_add_connection(text_dag, 0, 1, 1+1);
+  text_dag_add_connection(text_dag, 1, 2, 1+1);
+  text_dag_add_connection(text_dag,2, END_SEGMENT_ID, 1+1);
+  ++text_dag->num_sequences;
   // Return
   return text_dag;
 }

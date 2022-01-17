@@ -47,9 +47,13 @@ typedef struct {
   int* prev_weight;                 // Weight of the ingoing edges
   int* next;                        // Outgoing edges
   int next_total;
+  int* seq_rank;                    // Ranks of the sequences (wrt the order in which they are aligned)
+  int seq_rank_total;
 } text_dag_segment_t;
 typedef struct {
-  text_dag_segment_t** segments_ts; // Topologically Sorted
+  int num_sequences;
+  text_dag_segment_t** segments_ts; // Topologically Sorted (todo use rank_to_segment_id)
+  int* rank_to_segment_id;          // From ranks (topological sorted) to segment ids
   int segments_total;               // Total number of segments
   int* consensus;                   // Consensus sequence
   int consensus_len;                // Consensus sequence length
@@ -83,6 +87,10 @@ int text_dag_branch_completion(
         int segment_rank);
 void text_dag_traverse_heaviest_bundle(
         text_dag_t* const text_dag);
+void text_dag_generate_gfa(
+        text_dag_t* const text_dag,
+        const bool add_consensus
+        );
 /*
  * Examples
  */
